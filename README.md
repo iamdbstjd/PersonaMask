@@ -112,9 +112,9 @@ Character Mask + Privacy Redaction 콘솔 프로젝트입니다.
 
 ```mermaid
 flowchart LR
-    User[사용자 브라우저] --> WebUI[Web Console\nweb/src/app + features]
+    User["사용자 브라우저"] --> WebUI["Web Console<br/>web/src/app + features"]
 
-    WebUI -->|HTTP| API[FastAPI\napp/main.py]
+    WebUI -->|HTTP| API["FastAPI<br/>app/main.py"]
 
     API --> Health[Health/Diagnostics Router]
     API --> Presets[Presets Router]
@@ -128,7 +128,7 @@ flowchart LR
     Realtime --> DataDir[(data/uploads, data/outputs)]
     Videos --> DataDir
 
-    API --> Contracts[contracts/openapi.yaml\nJSON Schemas]
+    API --> Contracts["contracts/openapi.yaml<br/>JSON Schemas"]
 ```
 
 ### 2) 백엔드 내부 계층 아키텍처
@@ -136,7 +136,7 @@ flowchart LR
 ```mermaid
 flowchart TB
     subgraph Entry[Entry]
-      Main[app/main.py\ncreate_app(), --check]
+      Main["app/main.py<br/>create_app(), check mode"]
     end
 
     subgraph Router[API Routers]
