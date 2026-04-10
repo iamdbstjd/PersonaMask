@@ -1,0 +1,763 @@
+openapi: 3.1.0
+info:
+  title: Character Mask & Privacy Redaction API
+  version: 0.1.0
+  description: |
+    P0/P1 API contract skeleton derived from ARCHITECTURE.md.
+    Worker-3 owns the contract surface for frontend-backend integration,
+    especially realtime sessions, frame processing, allowlist, video jobs,
+    health, diagnostics, and common response/error envelopes.
+servers:
+  - url: /
+    description: Root server; paths retain the /api/v1 prefix.
+
+tags:
+  - name: health
+  - name: diagnostics
+  - name: presets
+  - name: allowlist
+  - name: realtime
+  - name: videos
+
+paths:
+  /api/v1/health:
+    get:
+      tags: [health]
+      summary: Check API and GPU runtime health.
+      operationId: getHealth
+      responses:
+        '200':
+          description: Health payload
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/v1/diagnostics/runtime:
+    get:
+      tags: [diagnostics]
+      summary: Inspect runtime readiness, model status, and queue availability.
+      operationId: getRuntimeDiagnostics
+      responses:
+        '200':
+          description: Runtime diagnostics payload
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            X-Trace-Latency-Ms:
+              $ref: '#/components/headers/XTraceLatencyMs'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticsResponse'
+
+  /api/v1/presets:
+    get:
+      tags: [presets]
+      summary: List character presets supported by the runtime.
+      operationId: listPresets
+      responses:
+        '200':
+          description: Preset collection
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresetsResponse'
+
+  /api/v1/allowlist/faces:
+    get:
+      tags: [allowlist]
+      summary: List registered allowlist faces.
+      operationId: listAllowlistFaces
+      responses:
+        '200':
+          description: Allowlist collection
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllowlistListResponse'
+    post:
+      tags: [allowlist]
+      summary: Register an allowlist face image.
+      operationId: createAllowlistFace
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image, label]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                label:
+                  type: string
+                note:
+                  type: string
+      responses:
+        '200':
+          description: Allowlist item created
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllowlistCreateResponse'
+        '400':
+          $ref: '#/components/responses/ApiError'
+
+  /api/v1/allowlist/faces/{person_id}:
+    delete:
+      tags: [allowlist]
+      summary: Delete an allowlist face by person id.
+      operationId: deleteAllowlistFace
+      parameters:
+        - $ref: '#/components/parameters/PersonId'
+      responses:
+        '200':
+          description: Allowlist item deleted
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllowlistDeleteResponse'
+        '404':
+          $ref: '#/components/responses/ApiError'
+
+  /api/v1/realtime/sessions:
+    post:
+      tags: [realtime]
+      summary: Create a realtime session for character or privacy mode.
+      operationId: createRealtimeSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RealtimeSessionCreateRequest'
+      responses:
+        '200':
+          description: Realtime session created
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RealtimeSessionResponse'
+        '400':
+          $ref: '#/components/responses/ApiError'
+
+  /api/v1/realtime/sessions/{session_id}:
+    delete:
+      tags: [realtime]
+      summary: Close a realtime session.
+      operationId: deleteRealtimeSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Realtime session closed
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RealtimeSessionDeleteResponse'
+        '404':
+          $ref: '#/components/responses/ApiError'
+
+  /api/v1/realtime/sessions/{session_id}/frames:
+    post:
+      tags: [realtime]
+      summary: Submit one frame to the realtime session.
+      operationId: processRealtimeFrame
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/XSessionId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [frame, meta]
+              properties:
+                frame:
+                  type: string
+                  format: binary
+                meta:
+                  type: string
+                  description: JSON encoded frame metadata.
+      responses:
+        '200':
+          description: Processed frame payload; binary_jpeg is the default P0 response mode.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            X-Trace-Latency-Ms:
+              $ref: '#/components/headers/XTraceLatencyMs'
+            X-Frame-Meta:
+              description: JSON encoded frame processing metadata.
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RealtimeFrameJsonResponse'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+
+  /api/v1/videos/jobs:
+    post:
+      tags: [videos]
+      summary: Create a batch privacy video job.
+      operationId: createVideoJob
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, config]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                config:
+                  type: string
+                  description: JSON encoded video job config.
+      responses:
+        '200':
+          description: Video job accepted
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoJobCreateResponse'
+        '400':
+          $ref: '#/components/responses/ApiError'
+
+  /api/v1/videos/jobs/{job_id}:
+    get:
+      tags: [videos]
+      summary: Poll video job status.
+      operationId: getVideoJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Video job status
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoJobStatusResponse'
+        '404':
+          $ref: '#/components/responses/ApiError'
+
+  /api/v1/videos/jobs/{job_id}/result:
+    get:
+      tags: [videos]
+      summary: Download the completed video job result.
+      operationId: downloadVideoJobResult
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Result video file
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+            video/webm:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/ApiError'
+
+  /api/v1/videos/jobs/{job_id}/cancel:
+    post:
+      tags: [videos]
+      summary: Cancel a queued or processing video job.
+      operationId: cancelVideoJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Video job cancel accepted
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoJobCancelResponse'
+        '404':
+          $ref: '#/components/responses/ApiError'
+
+components:
+  parameters:
+    PersonId:
+      name: person_id
+      in: path
+      required: true
+      schema:
+        type: string
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        type: string
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      schema:
+        type: string
+    XSessionId:
+      name: X-Session-Id
+      in: header
+      required: true
+      schema:
+        type: string
+
+  headers:
+    XRequestId:
+      description: Server-generated or propagated request id.
+      schema:
+        type: string
+    XTraceLatencyMs:
+      description: Optional processing latency metric in milliseconds.
+      schema:
+        type: number
+
+  responses:
+    ApiError:
+      description: Standard API error envelope
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    ErrorObject:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+    HealthData:
+      type: object
+      required: [status, app_version, gpu]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        app_version:
+          type: string
+        gpu:
+          type: object
+          required: [enabled, provider]
+          properties:
+            enabled:
+              type: boolean
+            provider:
+              type: string
+
+    HealthResponse:
+      type: object
+      required: [request_id, data, error]
+      properties:
+        request_id:
+          type: string
+        data:
+          $ref: '#/components/schemas/HealthData'
+        error:
+          type: 'null'
+
+    DiagnosticsResponse:
+      type: object
+      required: [request_id, data, error]
+      properties:
+        request_id:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+          description: Runtime diagnostics payload to be refined with worker-2 implementation.
+        error:
+          type: 'null'
+
+    PresetItem:
+      type: object
+      required: [preset_id, label, mode, thumbnail_url, supports_realtime]
+      properties:
+        preset_id:
+          type: string
+        label:
+          type: string
+        mode:
+          type: string
+          enum: [character]
+        thumbnail_url:
+          type: string
+        supports_realtime:
+          type: boolean
+
+    PresetsResponse:
+      type: object
+      required: [request_id, data, error]
+      properties:
+        request_id:
+          type: string
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/PresetItem'
+        error:
+          type: 'null'
+
+    AllowlistFace:
+      type: object
+      required: [person_id, label]
+      properties:
+        person_id:
+          type: string
+        label:
+          type: string
+        note:
+          type: string
+        embedding_status:
+          type: string
+
+    AllowlistCreateResponse:
+      type: object
+      required: [request_id, data, error]
+      properties:
+        request_id:
+          type: string
+        data:
+          $ref: '#/components/schemas/AllowlistFace'
+        error:
+          type: 'null'
+
+    AllowlistListResponse:
+      type: object
+      required: [request_id, data, error]
+      properties:
+        request_id:
+          type: string
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/AllowlistFace'
+        error:
+          type: 'null'
+
+    AllowlistDeleteResponse:
+      type: object
+      required: [request_id, data, error]
+      properties:
+        request_id:
+          type: string
+        data:
+          type: object
+          required: [deleted]
+          properties:
+            deleted:
+              type: boolean
+        error:
+          type: 'null'
+
+    StreamProfile:
+      type: object
+      required: [target_fps, frame_width, jpeg_quality, response_mode]
+      properties:
+        target_fps:
+          type: integer
+        frame_width:
+          type: integer
+        jpeg_quality:
+          type: number
+        response_mode:
+          type: string
+          enum: [binary_jpeg, json_base64]
+
+    PrivacyOptions:
+      type: object
+      required: [blur_faces, blur_plates, blur_text, allowlist_enabled]
+      properties:
+        blur_faces:
+          type: boolean
+        blur_plates:
+          type: boolean
+        blur_text:
+          type: boolean
+        allowlist_enabled:
+          type: boolean
+
+    RealtimeSessionCreateRequest:
+      type: object
+      required: [mode, stream_profile, privacy_options]
+      properties:
+        mode:
+          type: string
+          enum: [character, privacy]
+        preset_id:
+          type: string
+        stream_profile:
+          $ref: '#/components/schemas/StreamProfile'
+        privacy_options:
+          $ref: '#/components/schemas/PrivacyOptions'
+      allOf:
+        - if:
+            properties:
+              mode:
+                const: character
+          then:
+            required: [preset_id]
+
+    RealtimeSessionResponse:
+      type: object
+      required: [request_id, data, error]
+      properties:
+        request_id:
+          type: string
+        data:
+          type: object
+          required: [session_id, mode, accepted_profile, frame_endpoint, expires_in_sec]
+          properties:
+            session_id:
+              type: string
+            mode:
+              type: string
+              enum: [character, privacy]
+            accepted_profile:
+              $ref: '#/components/schemas/StreamProfile'
+            frame_endpoint:
+              type: string
+            expires_in_sec:
+              type: integer
+        error:
+          type: 'null'
+
+    RealtimeSessionDeleteResponse:
+      type: object
+      required: [request_id, data, error]
+      properties:
+        request_id:
+          type: string
+        data:
+          type: object
+          required: [closed]
+          properties:
+            closed:
+              type: boolean
+        error:
+          type: 'null'
+
+    DetectionCounts:
+      type: object
+      required: [faces_total, faces_redacted, plates_redacted, text_regions_redacted]
+      properties:
+        faces_total:
+          type: integer
+        faces_redacted:
+          type: integer
+        plates_redacted:
+          type: integer
+        text_regions_redacted:
+          type: integer
+
+    RealtimeFrameJsonResponse:
+      type: object
+      required: [request_id, data, error]
+      properties:
+        request_id:
+          type: string
+        data:
+          type: object
+          required: [frame_id, mime_type, processed_image_base64, server_latency_ms, detections]
+          properties:
+            frame_id:
+              type: integer
+            mime_type:
+              type: string
+            processed_image_base64:
+              type: string
+            server_latency_ms:
+              type: integer
+            detections:
+              $ref: '#/components/schemas/DetectionCounts'
+        error:
+          type: 'null'
+
+    OutputOptions:
+      type: object
+      required: [container, video_codec, keep_audio]
+      properties:
+        container:
+          type: string
+          enum: [mp4]
+        video_codec:
+          type: string
+          enum: [h264]
+        keep_audio:
+          type: boolean
+
+    VideoJobConfig:
+      type: object
+      required: [mode, privacy_options, output_options]
+      properties:
+        mode:
+          type: string
+          enum: [video_privacy]
+        privacy_options:
+          $ref: '#/components/schemas/PrivacyOptions'
+        output_options:
+          $ref: '#/components/schemas/OutputOptions'
+
+    VideoJobCreateResponse:
+      type: object
+      required: [request_id, data, error]
+      properties:
+        request_id:
+          type: string
+        data:
+          type: object
+          required: [job_id, status, status_endpoint, cancel_endpoint]
+          properties:
+            job_id:
+              type: string
+            status:
+              type: string
+              enum: [queued]
+            status_endpoint:
+              type: string
+            cancel_endpoint:
+              type: string
+        error:
+          type: 'null'
+
+    JobProgress:
+      type: object
+      required: [percent, processed_frames, total_frames, eta_sec]
+      properties:
+        percent:
+          type: integer
+        processed_frames:
+          type: integer
+        total_frames:
+          type: integer
+        eta_sec:
+          type: integer
+
+    VideoJobResult:
+      type: object
+      required: [download_url, preview_thumbnail_url, expires_at]
+      properties:
+        download_url:
+          type: string
+        preview_thumbnail_url:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    VideoJobStatusResponse:
+      type: object
+      required: [request_id, data, error]
+      properties:
+        request_id:
+          type: string
+        data:
+          type: object
+          required: [job_id, status, progress, result]
+          properties:
+            job_id:
+              type: string
+            status:
+              type: string
+              enum: [queued, processing, completed, failed, cancelled]
+            progress:
+              $ref: '#/components/schemas/JobProgress'
+            result:
+              oneOf:
+                - $ref: '#/components/schemas/VideoJobResult'
+                - type: 'null'
+        error:
+          type: 'null'
+
+    VideoJobCancelResponse:
+      type: object
+      required: [request_id, data, error]
+      properties:
+        request_id:
+          type: string
+        data:
+          type: object
+          required: [job_id, status]
+          properties:
+            job_id:
+              type: string
+            status:
+              type: string
+              enum: [cancelled]
+        error:
+          type: 'null'
+
+    ErrorResponse:
+      type: object
+      required: [request_id, data, error]
+      properties:
+        request_id:
+          type: string
+        data:
+          type: 'null'
+        error:
+          $ref: '#/components/schemas/ErrorObject'
