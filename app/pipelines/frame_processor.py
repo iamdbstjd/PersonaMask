@@ -186,7 +186,7 @@ def apply_privacy_effects(
     faces_redacted = 0
 
     if blur_faces:
-        for index, face in enumerate(faces):
+        for face in faces:
             if allowlist_enabled and primary is not None and face == primary:
                 continue
             _blur_region(output, face)
