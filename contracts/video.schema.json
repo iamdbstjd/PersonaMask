@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/video.schema.json",
+  "title": "Video job contract payloads",
+  "description": "Validation subset for batch video payloads derived from contracts/openapi.yaml and ARCHITECTURE.md examples.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/PrivacyOptions"
+    },
+    {
+      "$ref": "#/$defs/OutputOptions"
+    },
+    {
+      "$ref": "#/$defs/VideoJobConfig"
+    },
+    {
+      "$ref": "#/$defs/VideoJobCreateResponse"
+    },
+    {
+      "$ref": "#/$defs/JobProgress"
+    },
+    {
+      "$ref": "#/$defs/VideoJobResult"
+    },
+    {
+      "$ref": "#/$defs/VideoJobStatusResponse"
+    },
+    {
+      "$ref": "#/$defs/VideoJobCancelResponse"
+    }
+  ],
+  "$defs": {
+    "PrivacyOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blur_faces",
+        "blur_plates",
+        "blur_text",
+        "allowlist_enabled"
+      ],
+      "properties": {
+        "blur_faces": {
+          "type": "boolean"
+        },
+        "blur_plates": {
+          "type": "boolean"
+        },
+        "blur_text": {
+          "type": "boolean"
+        },
+        "allowlist_enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "OutputOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "container",
+        "video_codec",
+        "keep_audio"
+      ],
+      "properties": {
+        "container": {
+          "type": "string",
+          "enum": [
+            "mp4"
+          ]
+        },
+        "video_codec": {
+          "type": "string",
+          "enum": [
+            "h264"
+          ]
+        },
+        "keep_audio": {
+          "type": "boolean"
+        }
+      }
+    },
+    "VideoJobConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "privacy_options",
+        "output_options"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "video_privacy"
+          ]
+        },
+        "privacy_options": {
+          "$ref": "#/$defs/PrivacyOptions"
+        },
+        "output_options": {
+          "$ref": "#/$defs/OutputOptions"
+        }
+      }
+    },
+    "VideoJobCreateData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "job_id",
+        "status",
+        "status_endpoint",
+        "cancel_endpoint"
+      ],
+      "properties": {
+        "job_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "queued"
+          ]
+        },
+        "status_endpoint": {
+          "type": "string"
+        },
+        "cancel_endpoint": {
+          "type": "string"
+        }
+      }
+    },
+    "VideoJobCreateResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "data",
+        "error"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/VideoJobCreateData"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    "JobProgress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "percent",
+        "processed_frames",
+        "total_frames",
+        "eta_sec"
+      ],
+      "properties": {
+        "percent": {
+          "type": "integer"
+        },
+        "processed_frames": {
+          "type": "integer"
+        },
+        "total_frames": {
+          "type": "integer"
+        },
+        "eta_sec": {
+          "type": "integer"
+        }
+      }
+    },
+    "VideoJobResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "download_url",
+        "preview_thumbnail_url",
+        "expires_at"
+      ],
+      "properties": {
+        "download_url": {
+          "type": "string"
+        },
+        "preview_thumbnail_url": {
+          "type": "string"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "VideoJobStatusData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "job_id",
+        "status",
+        "progress",
+        "result"
+      ],
+      "properties": {
+        "job_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "queued",
+            "processing",
+            "completed",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "progress": {
+          "$ref": "#/$defs/JobProgress"
+        },
+        "result": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/VideoJobResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "VideoJobStatusResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "data",
+        "error"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/VideoJobStatusData"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    "VideoJobCancelData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "job_id",
+        "status"
+      ],
+      "properties": {
+        "job_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "cancelled"
+          ]
+        }
+      }
+    },
+    "VideoJobCancelResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "data",
+        "error"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/VideoJobCancelData"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    }
+  }
+}
