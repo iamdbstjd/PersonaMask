@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 from typing import Iterable
 
 import cv2
@@ -45,6 +46,9 @@ class ProcessingResult:
     primary_face: FaceBox | None
 
 
+StyleTransformer = Callable[[np.ndarray], np.ndarray]
+
+
 _FACE_CASCADE = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 
 
@@ -72,6 +76,7 @@ def detect_faces(image_bgr: np.ndarray) -> list[FaceBox]:
     faces: list[FaceBox] = []
     for x, y, w, h in raw_faces:
         faces.append(FaceBox(x1=int(x), y1=int(y), x2=int(x + w), y2=int(y + h)))
+    faces.sort(key=lambda face: face.area, reverse=True)
     return faces
 
 
@@ -93,6 +98,57 @@ def _blur_region(image_bgr: np.ndarray, box: FaceBox) -> None:
     kernel_h = max(7, ((y2 - y1) // 5) | 1)
     blurred = cv2.GaussianBlur(roi, (kernel_w, kernel_h), 0)
     image_bgr[y1:y2, x1:x2] = blurred
+
+
+def _expand_face_region(
+    box: FaceBox,
+    image_bgr: np.ndarray,
+    *,
+    horizontal_ratio: float = 0.28,
+    top_ratio: float = 0.42,
+    bottom_ratio: float = 0.2,
+) -> FaceBox:
+    height, width = image_bgr.shape[:2]
+    pad_x = int(round(box.width * horizontal_ratio))
+    pad_top = int(round(box.height * top_ratio))
+    pad_bottom = int(round(box.height * bottom_ratio))
+    return FaceBox(
+        x1=max(0, box.x1 - pad_x),
+        y1=max(0, box.y1 - pad_top),
+        x2=min(width, box.x2 + pad_x),
+        y2=min(height, box.y2 + pad_bottom),
+    )
+
+
+def _apply_face_transform(image_bgr: np.ndarray, face: FaceBox, transformer: StyleTransformer) -> np.ndarray:
+    output = image_bgr.copy()
+    region = _expand_face_region(face, image_bgr)
+    roi = output[region.y1:region.y2, region.x1:region.x2].copy()
+    styled_roi = transformer(roi)
+
+    relative_face = FaceBox(
+        x1=face.x1 - region.x1,
+        y1=face.y1 - region.y1,
+        x2=face.x2 - region.x1,
+        y2=face.y2 - region.y1,
+    )
+    mask = np.zeros(roi.shape[:2], dtype=np.uint8)
+    center = (
+        (relative_face.x1 + relative_face.x2) // 2,
+        (relative_face.y1 + relative_face.y2) // 2,
+    )
+    axes = (
+        max(1, int(round(relative_face.width * 0.85))),
+        max(1, int(round(relative_face.height * 1.15))),
+    )
+    cv2.ellipse(mask, center, axes, 0, 0, 360, 255, thickness=-1)
+    blur_kernel = max(5, ((min(roi.shape[:2]) // 8) | 1))
+    mask = cv2.GaussianBlur(mask, (blur_kernel, blur_kernel), 0)
+    mask_alpha = (mask.astype(np.float32) / 255.0)[..., None]
+
+    blended = styled_roi.astype(np.float32) * mask_alpha + roi.astype(np.float32) * (1.0 - mask_alpha)
+    output[region.y1:region.y2, region.x1:region.x2] = blended.astype(np.uint8)
+    return output
 
 
 def _detect_plate_candidates(image_bgr: np.ndarray) -> list[FaceBox]:
@@ -131,12 +187,12 @@ def apply_privacy_effects(
 
     if blur_faces:
         for index, face in enumerate(faces):
-            if allowlist_enabled and index == 0:
+            if allowlist_enabled and primary is not None and face == primary:
                 continue
             _blur_region(output, face)
             faces_redacted += 1
 
-    plate_boxes = _detect_plate_candidates(output) if blur_plates else []
+    plate_boxes = _detect_plate_candidates(image_bgr) if blur_plates else []
     for plate in plate_boxes:
         _blur_region(output, plate)
 
@@ -194,12 +250,18 @@ def apply_character_effects(image_bgr: np.ndarray, preset_id: str | None) -> Pro
     primary = _largest_face(faces)
     preset = (preset_id or "spider").lower()
 
+    transformer: StyleTransformer
     if preset == "bat":
-        output = _draw_bat_overlay(image_bgr)
+        transformer = _draw_bat_overlay
     elif preset in {"anime", "anime_mask"}:
-        output = _draw_anime_overlay(image_bgr)
+        transformer = _draw_anime_overlay
     else:
-        output = _draw_spider_overlay(image_bgr)
+        transformer = _draw_spider_overlay
+
+    if primary is None:
+        output = transformer(image_bgr)
+    else:
+        output = _apply_face_transform(image_bgr, primary, transformer)
 
     return ProcessingResult(
         image_bgr=output,
