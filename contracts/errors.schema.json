@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/errors.schema.json",
+  "title": "Shared error and envelope payloads",
+  "description": "Shared request_id/data/error envelope helpers derived from contracts/openapi.yaml.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ErrorObject"
+    },
+    {
+      "$ref": "#/$defs/ErrorResponse"
+    },
+    {
+      "$ref": "#/$defs/SuccessEnvelope"
+    }
+  ],
+  "$defs": {
+    "ErrorObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "data",
+        "error"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string"
+        },
+        "data": {
+          "type": "null"
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorObject"
+        }
+      }
+    },
+    "SuccessEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "data",
+        "error"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string"
+        },
+        "data": true,
+        "error": {
+          "type": "null"
+        }
+      }
+    }
+  }
+}
