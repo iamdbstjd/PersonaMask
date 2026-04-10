@@ -1,0 +1,41 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Test / tooling cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments / local env files
+.env
+.venv/
+venv/
+
+# Editor / OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Model artifacts
+models/insightface/models/
+models/swap/
+models/enhancers/
+*.onnx
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+*.bin
+*.zip
+
+# Runtime outputs
+/tmp/
+*.log
+
+# Keep documentation about models
+!models/README.md

@@ -1,0 +1,14 @@
+# Step 0 baseline environment
+# Locked runtime: conda env `bys` (Python 3.10.19)
+# This file is pinned to versions that are compatible with Python 3.10.
+
+numpy>=2.0,<2.3
+opencv-python==4.13.0.92
+onnxruntime-gpu==1.20.1
+insightface==0.7.3
+python-dotenv>=1.0,<2.0
+Pillow>=10,<12
+
+fastapi>=0.135,<1.0
+uvicorn>=0.34,<1.0
+python-multipart>=0.0.20,<1.0
