@@ -5,6 +5,7 @@ from typing import Any
 
 from app.core.config import Settings
 from app.core.gpu import probe_runtime
+from app.repositories.job_repository import job_repository
 
 
 class DiagnosticsService:
@@ -33,8 +34,16 @@ class DiagnosticsService:
 
     def diagnostics_payload(self) -> dict[str, Any]:
         runtime = probe_runtime()
+        gpu_status = "ready" if runtime.get("cuda_enabled") else "cpu_only"
+        api_status = "healthy"
+        runtime_status = "ready"
+        queue_depth = job_repository.get_queue_depth()
         return {
             "status": "ok",
+            "api_status": api_status,
+            "gpu_status": gpu_status,
+            "runtime_status": runtime_status,
+            "queue_depth": queue_depth,
             "settings": {
                 "app_name": self.settings.app_name,
                 "app_env": self.settings.app_env,

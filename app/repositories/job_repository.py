@@ -42,6 +42,7 @@ class JobRepository:
         upload_path: str,
         filename: str,
         content_type: str | None,
+        total_frames: int = 3000,
     ) -> JobRecord:
         record = JobRecord(
             job_id=f"job_{uuid4().hex[:8]}",
@@ -50,6 +51,12 @@ class JobRepository:
             upload_path=upload_path,
             filename=filename,
             content_type=content_type,
+            progress={
+                "percent": 0,
+                "processed_frames": 0,
+                "total_frames": max(1, int(total_frames or 1)),
+                "eta_sec": 90,
+            },
         )
         with self._lock:
             self._jobs[record.job_id] = record
@@ -83,10 +90,14 @@ class JobRepository:
             return record
 
     def cancel(self, job_id: str) -> JobRecord | None:
+        total_frames = 3000
+        current = self.get(job_id)
+        if current is not None:
+            total_frames = int(current.progress.get("total_frames", 3000))
         return self.update_status(
             job_id,
             status="cancelled",
-            progress={"percent": 0, "processed_frames": 0, "total_frames": 3000, "eta_sec": 0},
+            progress={"percent": 0, "processed_frames": 0, "total_frames": total_frames, "eta_sec": 0},
         )
 
     def advance(self, job_id: str) -> JobRecord | None:
@@ -97,14 +108,32 @@ class JobRepository:
 
             age = (datetime.now(timezone.utc) - record.created_at).total_seconds()
             if age < 1.0:
+                total_frames = int(record.progress.get("total_frames", 3000))
                 record.status = "queued"
-                record.progress = {"percent": 5, "processed_frames": 120, "total_frames": 3000, "eta_sec": 80}
+                record.progress = {
+                    "percent": 5,
+                    "processed_frames": max(1, int(total_frames * 0.05)),
+                    "total_frames": total_frames,
+                    "eta_sec": 80,
+                }
             elif age < 2.0:
+                total_frames = int(record.progress.get("total_frames", 3000))
                 record.status = "processing"
-                record.progress = {"percent": 45, "processed_frames": 1350, "total_frames": 3000, "eta_sec": 40}
+                record.progress = {
+                    "percent": 45,
+                    "processed_frames": max(1, int(total_frames * 0.45)),
+                    "total_frames": total_frames,
+                    "eta_sec": 40,
+                }
             else:
+                total_frames = int(record.progress.get("total_frames", 3000))
                 record.status = "completed"
-                record.progress = {"percent": 100, "processed_frames": 3000, "total_frames": 3000, "eta_sec": 0}
+                record.progress = {
+                    "percent": 100,
+                    "processed_frames": total_frames,
+                    "total_frames": total_frames,
+                    "eta_sec": 0,
+                }
                 if record.result is None:
                     expires_at = datetime.now(timezone.utc) + timedelta(days=1)
                     record.result = {
@@ -114,6 +143,10 @@ class JobRepository:
                     }
             record.updated_at = datetime.now(timezone.utc)
             return record
+
+    def get_queue_depth(self) -> int:
+        with self._lock:
+            return sum(1 for record in self._jobs.values() if record.status in {"queued", "processing"})
 
 
 job_repository = JobRepository()

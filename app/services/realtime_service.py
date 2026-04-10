@@ -7,6 +7,12 @@ from typing import Any
 
 from fastapi import HTTPException, UploadFile, status
 
+from app.pipelines.frame_processor import (
+    apply_character_effects,
+    apply_privacy_effects,
+    decode_image_bytes,
+    encode_jpeg,
+)
 from app.repositories.session_repository import session_repository
 from app.schemas.realtime import (
     DetectionCounts,
@@ -69,17 +75,41 @@ class RealtimeService:
         started = perf_counter()
         meta = self._load_meta(raw_meta, session.mode)
         frame_bytes = await frame.read()
+        try:
+            decoded = decode_image_bytes(frame_bytes)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "INVALID_FRAME", "message": str(exc)},
+            ) from exc
+
+        if session.mode == "privacy":
+            processing = apply_privacy_effects(
+                decoded,
+                blur_faces=bool(session.privacy_options.get("blur_faces", True)),
+                blur_plates=bool(session.privacy_options.get("blur_plates", False)),
+                blur_text=bool(session.privacy_options.get("blur_text", False)),
+                allowlist_enabled=bool(session.privacy_options.get("allowlist_enabled", False)),
+            )
+        else:
+            processing = apply_character_effects(decoded, session.preset_id)
+
+        output_bytes = encode_jpeg(processing.image_bgr, float(session.stream_profile.get("jpeg_quality", 0.72)))
         server_latency_ms = max(1, int((perf_counter() - started) * 1000))
 
-        faces_total = 1 if frame_bytes else 0
-        allowlist_enabled = bool(session.privacy_options.get("allowlist_enabled", False))
         detections = DetectionCounts(
-            faces_total=faces_total,
-            faces_redacted=1 if session.mode == "privacy" and faces_total and not allowlist_enabled else 0,
-            plates_redacted=1 if session.mode == "privacy" and session.privacy_options.get("blur_plates") else 0,
-            text_regions_redacted=1 if session.mode == "privacy" and session.privacy_options.get("blur_text") else 0,
+            faces_total=processing.detections.faces_total,
+            faces_redacted=processing.detections.faces_redacted,
+            plates_redacted=processing.detections.plates_redacted,
+            text_regions_redacted=processing.detections.text_regions_redacted,
         )
-        primary_face = PrimaryFace(bbox=[120, 90, 320, 310], preset_id=session.preset_id if session.mode == "character" else None)
+        primary_face = None
+        if processing.primary_face is not None:
+            primary_face = PrimaryFace(
+                bbox=processing.primary_face.as_list(),
+                preset_id=session.preset_id if session.mode == "character" else None,
+            )
+
         result_meta = FrameResultMeta(
             frame_id=meta.frame_id,
             server_latency_ms=server_latency_ms,
@@ -92,11 +122,11 @@ class RealtimeService:
 
         return {
             "response_mode": session.stream_profile.get("response_mode", "binary_jpeg"),
-            "content": frame_bytes,
+            "content": output_bytes,
             "frame_meta": result_meta,
             "json_data": JsonFrameData(
                 frame_id=meta.frame_id,
-                processed_image_base64=base64.b64encode(frame_bytes).decode("ascii"),
+                processed_image_base64=base64.b64encode(output_bytes).decode("ascii"),
                 server_latency_ms=server_latency_ms,
                 detections=detections,
                 primary_face=primary_face,

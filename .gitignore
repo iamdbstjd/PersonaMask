@@ -36,6 +36,7 @@ models/enhancers/
 # Runtime outputs
 /tmp/
 *.log
+data/
 
 # Frontend build artifacts
 web/node_modules/
