@@ -1,3 +1,5 @@
+"use client";
+
 import { PanelCard } from "../common/panel-card";
 import { StatusBadge } from "../common/status-badge";
 

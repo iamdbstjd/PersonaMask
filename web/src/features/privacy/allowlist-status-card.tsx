@@ -1,3 +1,5 @@
+"use client";
+
 import { PanelCard } from "../../components/common/panel-card";
 import { StatusBadge } from "../../components/common/status-badge";
 

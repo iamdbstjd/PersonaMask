@@ -37,5 +37,14 @@ models/enhancers/
 /tmp/
 *.log
 
+# Frontend build artifacts
+web/node_modules/
+web/.next/
+web/.turbo/
+web/*.tsbuildinfo
+
+# Local orchestration state
+.omx/
+
 # Keep documentation about models
 !models/README.md

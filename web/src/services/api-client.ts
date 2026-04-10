@@ -1,4 +1,6 @@
-const API_BASE_PATH = "/api/v1";
+import { API_BASE_PATH } from "../lib/runtime-config";
+
+export { API_BASE_PATH };
 
 export type ApiErrorPayload = {
   code?: string;
@@ -52,6 +54,11 @@ function normalizeApiPath(path: string) {
 
   if (path.startsWith(API_BASE_PATH)) {
     return path;
+  }
+
+  if ((API_BASE_PATH.startsWith("http://") || API_BASE_PATH.startsWith("https://")) && path.startsWith("/api/v1")) {
+    const origin = API_BASE_PATH.endsWith("/api/v1") ? API_BASE_PATH.slice(0, -"/api/v1".length) : API_BASE_PATH;
+    return `${origin}${path}`;
   }
 
   return `${API_BASE_PATH}${path.startsWith("/") ? path : `/${path}`}`;

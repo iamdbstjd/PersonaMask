@@ -19,6 +19,7 @@ type UseFrameUploaderOptions = {
 };
 
 export function useFrameUploader(options: UseFrameUploaderOptions) {
+  const { enabled, mode, sessionId, acceptedProfile, privacyOptions, captureFrame } = options;
   const frameIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<number | null>(null);
@@ -27,15 +28,15 @@ export function useFrameUploader(options: UseFrameUploaderOptions) {
   const [lastUploadError, setLastUploadError] = useState<string | null>(null);
 
   const intervalMs = useMemo(() => {
-    if (!options.acceptedProfile?.targetFps) {
+    if (!acceptedProfile?.targetFps) {
       return 220;
     }
 
-    return Math.max(120, Math.round(1000 / Math.max(1, options.acceptedProfile.targetFps)));
-  }, [options.acceptedProfile?.targetFps]);
+    return Math.max(120, Math.round(1000 / Math.max(1, acceptedProfile.targetFps)));
+  }, [acceptedProfile?.targetFps]);
 
   useEffect(() => {
-    if (!options.enabled || !options.sessionId || !options.acceptedProfile) {
+    if (!enabled || !sessionId || !acceptedProfile) {
       setIsUploading(false);
       sessionStore.setUploading(false);
       return;
@@ -58,7 +59,7 @@ export function useFrameUploader(options: UseFrameUploaderOptions) {
     };
 
     const tick = async () => {
-      if (cancelled || inFlightRef.current || !options.sessionId || !options.acceptedProfile) {
+      if (cancelled || inFlightRef.current || !sessionId || !acceptedProfile) {
         if (!cancelled) {
           scheduleTick(intervalMs);
         }
@@ -72,10 +73,10 @@ export function useFrameUploader(options: UseFrameUploaderOptions) {
 
       try {
         const frameId = ++frameIdRef.current;
-        const captured = await options.captureFrame({
+        const captured = await captureFrame({
           mimeType: "image/jpeg",
-          quality: options.acceptedProfile.jpegQuality,
-          targetWidth: options.acceptedProfile.frameWidth,
+          quality: acceptedProfile.jpegQuality,
+          targetWidth: acceptedProfile.frameWidth,
         });
 
         if (!captured) {
@@ -85,7 +86,7 @@ export function useFrameUploader(options: UseFrameUploaderOptions) {
         sessionStore.setOriginalFrame(captured.dataUrl);
 
         const result = await processRealtimeFrame({
-          sessionId: options.sessionId,
+          sessionId,
           frame: captured.blob,
           meta: {
             frameId,
@@ -93,7 +94,7 @@ export function useFrameUploader(options: UseFrameUploaderOptions) {
             clientWidth: captured.width,
             clientHeight: captured.height,
             rotationDeg: 0,
-            mode: options.mode,
+            mode,
           },
           signal: abortRef.current.signal,
         });
@@ -143,11 +144,11 @@ export function useFrameUploader(options: UseFrameUploaderOptions) {
       setIsUploading(false);
       sessionStore.setUploading(false);
     };
-  }, [options.acceptedProfile, options.captureFrame, options.enabled, intervalMs, options.mode, options.sessionId]);
+  }, [acceptedProfile, captureFrame, enabled, intervalMs, mode, sessionId]);
 
   return {
     isUploading,
     lastUploadError,
-    activePolicy: options.privacyOptions,
+    activePolicy: privacyOptions,
   };
 }

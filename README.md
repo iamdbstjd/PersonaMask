@@ -247,22 +247,34 @@ python -m app.main --check
 ### 3) 서버 실행
 
 ```bash
-python -m app.main --host 0.0.0.0 --port 8000
+python -m app.main --host 127.0.0.1 --port 8001
 ```
 
-### 4) 기본 API 확인
+### 4) 웹 콘솔 실행
 
 ```bash
-curl http://127.0.0.1:8000/api/v1/health
-curl http://127.0.0.1:8000/api/v1/diagnostics/runtime
-curl http://127.0.0.1:8000/api/v1/presets
+cd web
+cp .env.local.example .env.local
+npm install
+npm run dev
 ```
 
-### 5) 실시간 세션 빠른 테스트
+- 기본 웹 콘솔 주소: `http://127.0.0.1:3000`
+- 기본 API 프록시 대상: `http://127.0.0.1:8001` (`BACKEND_ORIGIN`)
+
+### 5) 기본 API 확인
+
+```bash
+curl http://127.0.0.1:8001/api/v1/health
+curl http://127.0.0.1:8001/api/v1/diagnostics/runtime
+curl http://127.0.0.1:8001/api/v1/presets
+```
+
+### 6) 실시간 세션 빠른 테스트
 
 ```bash
 # 세션 생성
-curl -X POST http://127.0.0.1:8000/api/v1/realtime/sessions \
+curl -X POST http://127.0.0.1:8001/api/v1/realtime/sessions \
   -H 'Content-Type: application/json' \
   -d '{
         "mode":"privacy",
@@ -271,10 +283,10 @@ curl -X POST http://127.0.0.1:8000/api/v1/realtime/sessions \
       }'
 ```
 
-### 6) 비디오 배치 빠른 테스트
+### 7) 비디오 배치 빠른 테스트
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/v1/videos/jobs \
+curl -X POST http://127.0.0.1:8001/api/v1/videos/jobs \
   -F 'file=@sample.mp4' \
   -F 'config={"mode":"video_privacy"}'
 ```
@@ -313,6 +325,7 @@ curl -X POST http://127.0.0.1:8000/api/v1/videos/jobs \
 ```bash
 python -m app.main --check
 python -m compileall app
+cd web && npm run typecheck && npm run build
 ```
 
 필요 시:

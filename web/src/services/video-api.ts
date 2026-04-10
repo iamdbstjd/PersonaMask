@@ -1,4 +1,6 @@
-export const VIDEO_JOB_BASE_PATH = "/api/v1/videos/jobs";
+import { API_BASE_PATH } from "./api-client";
+
+export const VIDEO_JOB_BASE_PATH = `${API_BASE_PATH}/videos/jobs`;
 
 export type VideoJobUiStatus =
   | "idle"

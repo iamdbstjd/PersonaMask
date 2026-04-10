@@ -1,3 +1,5 @@
+"use client";
+
 import { StatusBadge } from "../../components/common/status-badge";
 
 type ErrorNoticeProps = {

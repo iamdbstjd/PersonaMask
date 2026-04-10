@@ -1,3 +1,5 @@
+"use client";
+
 const TONES = {
   neutral: {
     backgroundColor: "#f3f4f6",

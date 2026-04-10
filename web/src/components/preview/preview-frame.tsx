@@ -1,3 +1,6 @@
+"use client";
+
+import Image from "next/image";
 import { PanelCard } from "../common/panel-card";
 
 type PreviewFrameProps = {
@@ -13,6 +16,7 @@ export function PreviewFrame({ title, kicker, description, imageSrc, emptyLabel 
     <PanelCard kicker={kicker} title={title} description={description}>
       <div
         style={{
+          position: "relative",
           minHeight: "240px",
           borderRadius: "16px",
           overflow: "hidden",
@@ -23,7 +27,7 @@ export function PreviewFrame({ title, kicker, description, imageSrc, emptyLabel 
         }}
       >
         {imageSrc ? (
-          <img src={imageSrc} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          <Image src={imageSrc} alt={title} fill unoptimized style={{ objectFit: "cover", display: "block" }} />
         ) : (
           <span style={{ color: "#64748b", padding: "1rem", textAlign: "center", lineHeight: 1.6 }}>{emptyLabel}</span>
         )}

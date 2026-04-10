@@ -1,3 +1,5 @@
+"use client";
+
 import type { DetectionCounts } from "../../services/realtime-api";
 import { StatusBadge } from "../common/status-badge";
 import { PreviewFrame } from "./preview-frame";
@@ -7,9 +9,20 @@ type BeforeAfterPreviewProps = {
   processedFrameSrc: string | null;
   detections: DetectionCounts | null;
   latencyMs: number | null;
+  afterTitle?: string;
+  afterDescription?: string;
+  afterEmptyLabel?: string;
 };
 
-export function BeforeAfterPreview({ originalFrameSrc, processedFrameSrc, detections, latencyMs }: BeforeAfterPreviewProps) {
+export function BeforeAfterPreview({
+  originalFrameSrc,
+  processedFrameSrc,
+  detections,
+  latencyMs,
+  afterTitle = "Processed preview",
+  afterDescription = "백엔드 처리 응답이 이 영역에 갱신됩니다.",
+  afterEmptyLabel = "세션을 시작하면 처리된 프리뷰가 이 영역에 표시됩니다.",
+}: BeforeAfterPreviewProps) {
   return (
     <div style={{ display: "grid", gap: "1rem" }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
@@ -38,10 +51,10 @@ export function BeforeAfterPreview({ originalFrameSrc, processedFrameSrc, detect
         />
         <PreviewFrame
           kicker="After"
-          title="Processed preview"
-          description="백엔드 privacy redactor 응답이 이 영역에 갱신됩니다."
+          title={afterTitle}
+          description={afterDescription}
           imageSrc={processedFrameSrc}
-          emptyLabel="세션을 시작하면 처리된 privacy preview가 이 영역에 표시됩니다."
+          emptyLabel={afterEmptyLabel}
         />
       </div>
     </div>

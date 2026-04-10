@@ -1,3 +1,5 @@
+"use client";
+
 import type { VideoJobUiStatus } from "../../services/video-api";
 
 type TimelineStep = {
