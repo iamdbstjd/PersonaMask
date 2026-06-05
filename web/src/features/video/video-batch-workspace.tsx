@@ -30,6 +30,20 @@ function getStatusTone(status: UseVideoJobResult["status"]): "neutral" | "succes
   }
 }
 
+function formatVideoStatus(status: UseVideoJobResult["status"]): string {
+  const labels: Record<UseVideoJobResult["status"], string> = {
+    idle: "대기",
+    uploading: "업로드 중",
+    queued: "대기열 등록",
+    processing: "처리 중",
+    completed: "완료",
+    failed: "실패",
+    cancelled: "취소됨",
+  };
+
+  return labels[status];
+}
+
 export function VideoBatchWorkspace({ controller }: VideoBatchWorkspaceProps) {
   const { config, selectedFile, dragActive, status, job, lastError } = controller;
 
@@ -39,16 +53,16 @@ export function VideoBatchWorkspace({ controller }: VideoBatchWorkspaceProps) {
 
       <div className="stack-lg">
         <PanelCard
-          kicker="Upload + config"
-          title="Prepare review render"
+          kicker="업로드 + 설정"
+          title="리뷰 렌더 준비"
           description="소스 영상과 렌더 모드를 먼저 확정하고, 후보 얼굴 검토 기반의 저장 영상 결과를 생성합니다."
           tone="accent"
         >
           <div className="stack-md">
             <div className="cluster">
-              <StatusBadge label={selectedFile ? "File ready" : "Waiting for file"} tone={selectedFile ? "success" : "neutral"} />
-              <StatusBadge label={`Job state · ${status}`} tone={getStatusTone(status)} />
-              <StatusBadge label={controller.canCancel ? "Cancellation available" : "Cancellation inactive"} tone="neutral" />
+              <StatusBadge label={selectedFile ? "파일 준비됨" : "파일 대기 중"} tone={selectedFile ? "success" : "neutral"} />
+              <StatusBadge label={`작업 상태 · ${formatVideoStatus(status)}`} tone={getStatusTone(status)} />
+              <StatusBadge label={controller.canCancel ? "취소 가능" : "취소 비활성"} tone="neutral" />
             </div>
 
             <VideoUploadDropzone
@@ -73,8 +87,8 @@ export function VideoBatchWorkspace({ controller }: VideoBatchWorkspaceProps) {
         />
 
         <PanelCard
-          kicker="Batch configuration"
-          title="Video review render mode"
+          kicker="배치 설정"
+          title="영상 리뷰 렌더 모드"
           description="후보 검토 후 적용할 렌더 정책과 출력 옵션을 관리합니다."
         >
           <div className="stack-md">
@@ -88,22 +102,22 @@ export function VideoBatchWorkspace({ controller }: VideoBatchWorkspaceProps) {
             />
             <div className="cluster">
               <Button disabled={!controller.canSubmit} onClick={() => void controller.submit()} variant="primary">
-                Submit review render job
+                리뷰 렌더 작업 제출
               </Button>
               <Button disabled={!controller.canCancel} onClick={() => void controller.cancel()} variant="secondary">
-                Cancel current job
+                현재 작업 취소
               </Button>
               <Button onClick={controller.reset} variant="ghost">
-                Reset lane state
+                화면 상태 초기화
               </Button>
             </div>
           </div>
         </PanelCard>
 
         <PanelCard
-          kicker="QA Report"
-          title="Download reviewed result"
-          description="완료된 저장 영상, contact sheet, QA 리포트를 함께 확인합니다."
+          kicker="QA 리포트"
+          title="리뷰 결과 다운로드"
+          description="완료된 저장 영상, 전후 비교 시트, QA 리포트를 함께 확인합니다."
         >
           <VideoResultCard status={status} result={job?.result ?? null} />
         </PanelCard>

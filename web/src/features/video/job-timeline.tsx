@@ -11,33 +11,33 @@ type TimelineStep = {
 const TIMELINE_STEPS: readonly TimelineStep[] = [
   {
     key: "uploading",
-    label: "Upload accepted",
-    description: "Video file and JSON config are being sent as multipart form-data.",
+    label: "업로드 접수",
+    description: "영상 파일과 JSON 설정을 multipart form-data로 전송합니다.",
   },
   {
     key: "queued",
-    label: "Queued",
-    description: "The backend has created a batch job and is waiting for worker capacity.",
+    label: "대기열 등록",
+    description: "백엔드가 배치 작업을 만들고 사용 가능한 처리 자원을 기다립니다.",
   },
   {
     key: "processing",
-    label: "Processing",
-    description: "Poll frame progress and ETA without blocking the operator in this route.",
+    label: "처리 중",
+    description: "이 화면을 막지 않고 프레임 진행률과 예상 시간을 폴링합니다.",
   },
   {
     key: "completed",
-    label: "Completed",
-    description: "Expose download URL, thumbnail preview, and expiry metadata.",
+    label: "완료",
+    description: "다운로드 URL, 썸네일 프리뷰, 만료 정보를 표시합니다.",
   },
   {
     key: "failed",
-    label: "Failed",
-    description: "Surface the latest failure reason with retry guidance near the uploader.",
+    label: "실패",
+    description: "최근 실패 사유와 재시도 안내를 업로더 근처에 표시합니다.",
   },
   {
     key: "cancelled",
-    label: "Cancelled",
-    description: "Keep the last known job context visible even after a user cancellation.",
+    label: "취소됨",
+    description: "사용자가 취소한 뒤에도 마지막 작업 맥락을 볼 수 있게 유지합니다.",
   },
 ] as const;
 

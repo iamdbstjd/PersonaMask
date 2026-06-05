@@ -174,8 +174,8 @@ async function requestJson<T>(input: RequestInfo | URL, init: RequestInit, fetch
   if (!response.ok) {
     const message =
       typeof body === "object" && body !== null && "error" in body
-        ? "Video API request failed"
-        : `Video API request failed with status ${response.status}`;
+        ? "영상 API 요청이 실패했습니다."
+        : `영상 API 요청이 실패했습니다. 상태 코드: ${response.status}`;
 
     throw new VideoApiError(message, response.status, body);
   }

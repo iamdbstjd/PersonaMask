@@ -32,7 +32,7 @@ const INITIAL_STATE: DiagnosticsStoreState = {
   runtimeStatus: "unknown",
   queueDepth: null,
   currentMode: "privacy",
-  currentPreset: "Privacy Balanced",
+  currentPreset: "프라이버시 기본",
   recentLatencyMs: null,
   recentDetectionCount: null,
   lastError: null,
@@ -79,6 +79,32 @@ function toneFromStatus(status: string): DiagnosticsTone {
   return "neutral";
 }
 
+export function formatDiagnosticsStatus(status: string): string {
+  const normalized = status.toLowerCase();
+
+  if (normalized.includes("healthy") || normalized.includes("ready") || normalized === "ok") {
+    return "정상";
+  }
+
+  if (normalized.includes("warn")) {
+    return "주의";
+  }
+
+  if (normalized.includes("degrad")) {
+    return "성능 저하";
+  }
+
+  if (normalized.includes("fail") || normalized.includes("error") || normalized.includes("down")) {
+    return "오류";
+  }
+
+  if (normalized.includes("unknown")) {
+    return "알 수 없음";
+  }
+
+  return status;
+}
+
 export const diagnosticsStore = {
   subscribe(listener: () => void) {
     listeners.add(listener);
@@ -117,17 +143,17 @@ export const diagnosticsStore = {
 
 export function selectDiagnosticsItems(snapshot: DiagnosticsStoreState): DiagnosticsItem[] {
   return [
-    { label: "API", value: snapshot.apiStatus, tone: toneFromStatus(snapshot.apiStatus) },
-    { label: "GPU", value: snapshot.gpuStatus, tone: toneFromStatus(snapshot.gpuStatus) },
-    { label: "Runtime", value: snapshot.runtimeStatus, tone: toneFromStatus(snapshot.runtimeStatus) },
+    { label: "API", value: formatDiagnosticsStatus(snapshot.apiStatus), tone: toneFromStatus(snapshot.apiStatus) },
+    { label: "GPU", value: formatDiagnosticsStatus(snapshot.gpuStatus), tone: toneFromStatus(snapshot.gpuStatus) },
+    { label: "런타임", value: formatDiagnosticsStatus(snapshot.runtimeStatus), tone: toneFromStatus(snapshot.runtimeStatus) },
     {
-      label: "Latency",
-      value: snapshot.recentLatencyMs === null ? "—" : `${snapshot.recentLatencyMs} ms`,
+      label: "지연시간",
+      value: snapshot.recentLatencyMs === null ? "-" : `${snapshot.recentLatencyMs}ms`,
       tone: snapshot.recentLatencyMs !== null && snapshot.recentLatencyMs > 180 ? "warning" : "neutral",
     },
     {
-      label: "Detections",
-      value: snapshot.recentDetectionCount === null ? "—" : `${snapshot.recentDetectionCount} redactions`,
+      label: "검출",
+      value: snapshot.recentDetectionCount === null ? "-" : `리댁션 ${snapshot.recentDetectionCount}개`,
       tone: snapshot.recentDetectionCount ? "warning" : "neutral",
     },
   ];

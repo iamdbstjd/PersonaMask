@@ -47,6 +47,16 @@ function readStatus(record: Record<string, unknown>, keys: string[], fallback: s
   return fallback;
 }
 
+function formatPresetLabel(label: string): string {
+  const labels: Record<string, string> = {
+    "Spider Mask": "스파이더 마스크",
+    "Bat Mask": "배트 마스크",
+    "Anime Mask": "애니메이션 마스크",
+  };
+
+  return labels[label] ?? label;
+}
+
 export async function fetchRuntimeDiagnostics(): Promise<RuntimeDiagnosticsSnapshot> {
   const result = await requestApiEnvelope<DiagnosticsResponseData>("/diagnostics/runtime", {
     method: "GET",
@@ -81,7 +91,7 @@ export async function fetchPresets(): Promise<PresetItem[]> {
 
   return result.data.items.map((item) => ({
     presetId: item.preset_id,
-    label: item.label,
+    label: formatPresetLabel(item.label),
     mode: item.mode,
     thumbnailUrl: item.thumbnail_url,
     supportsRealtime: item.supports_realtime,

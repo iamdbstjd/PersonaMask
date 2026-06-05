@@ -26,8 +26,8 @@ export function CameraViewport({
 }: CameraViewportProps) {
   return (
     <PanelCard
-      kicker="Camera"
-      title="Live camera source"
+      kicker="카메라"
+      title="실시간 카메라 입력"
       description="브라우저 카메라 연결과 세션 입력 상태를 한눈에 확인할 수 있게 단순화했습니다."
     >
       <div className="stack-md">
@@ -44,9 +44,9 @@ export function CameraViewport({
           {!isActive ? (
             <div className="viewport-overlay">
               <div className="stack-xs">
-                <strong>Camera preview standby</strong>
+                <strong>카메라 프리뷰 대기 중</strong>
                 <span>
-                  Start camera를 누르면 getUserMedia가 연결되고, 이후 realtime session을 바로 시작할 수 있습니다.
+                  카메라 시작을 누르면 브라우저 카메라가 연결되고, 이후 실시간 세션을 바로 시작할 수 있습니다.
                 </span>
               </div>
             </div>

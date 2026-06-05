@@ -12,22 +12,29 @@ type CameraToolbarProps = {
 };
 
 export function CameraToolbar({ isStarting, isActive, permission, onStartCamera, onStopCamera }: CameraToolbarProps) {
+  const permissionLabel = {
+    idle: "대기",
+    requesting: "권한 요청 중",
+    granted: "허용됨",
+    denied: "거부됨",
+  }[permission];
+
   return (
     <div className="cluster-between">
       <div className="cluster">
         <StatusBadge
-          label={`Camera · ${permission}`}
+          label={`카메라 · ${permissionLabel}`}
           tone={permission === "granted" ? "success" : permission === "denied" ? "danger" : "neutral"}
         />
-        <StatusBadge label={isActive ? "Stream attached" : "Stream idle"} tone={isActive ? "success" : "warning"} />
+        <StatusBadge label={isActive ? "스트림 연결됨" : "스트림 대기"} tone={isActive ? "success" : "warning"} />
       </div>
 
       <div className="cluster">
         <Button onClick={onStartCamera} disabled={isStarting || isActive} variant="secondary">
-          {isStarting ? "Starting…" : "Start camera"}
+          {isStarting ? "시작 중..." : "카메라 시작"}
         </Button>
         <Button onClick={onStopCamera} disabled={!isActive} variant="primary">
-          Stop camera
+          카메라 중지
         </Button>
       </div>
     </div>

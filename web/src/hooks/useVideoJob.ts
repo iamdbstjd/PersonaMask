@@ -86,7 +86,7 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Unexpected video job error.";
+  return "예상하지 못한 영상 작업 오류가 발생했습니다.";
 }
 
 function deriveModeFromActions(actions: Record<string, CandidateAction>, fallback: VideoJobProcessingMode): VideoJobProcessingMode {
@@ -183,7 +183,7 @@ export function useVideoJob({
 
   const analyzeCandidates = useCallback(async () => {
     if (!selectedFile) {
-      setLastError("Choose a video file before running candidate analysis.");
+      setLastError("후보 분석을 실행하기 전에 영상 파일을 선택하세요.");
       return;
     }
 
@@ -279,7 +279,7 @@ export function useVideoJob({
 
   const submit = useCallback(async () => {
     if (!selectedFile) {
-      setLastError("Choose a video file before submitting the privacy batch job.");
+      setLastError("프라이버시 배치 작업을 제출하기 전에 영상 파일을 선택하세요.");
       return;
     }
 

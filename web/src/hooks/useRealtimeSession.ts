@@ -23,7 +23,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions) {
 
   useEffect(() => {
     sessionStore.setMode(options.mode);
-    diagnosticsStore.setSessionContext({ mode: options.mode, presetLabel: options.presetLabel ?? "Privacy Balanced" });
+    diagnosticsStore.setSessionContext({ mode: options.mode, presetLabel: options.presetLabel ?? "프라이버시 기본" });
   }, [options.mode, options.presetLabel]);
 
   const startSession = useCallback(async () => {
@@ -39,7 +39,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions) {
       });
 
       sessionStore.setStreamingSession(session);
-      diagnosticsStore.setSessionContext({ mode: session.mode, presetLabel: options.presetLabel ?? "Privacy Balanced" });
+      diagnosticsStore.setSessionContext({ mode: session.mode, presetLabel: options.presetLabel ?? "프라이버시 기본" });
       diagnosticsStore.setError(null);
 
       return session;

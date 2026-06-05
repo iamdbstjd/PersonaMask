@@ -6,29 +6,29 @@ import { AppShell } from "../components/common/app-shell";
 import { ModeCard } from "../components/common/mode-card";
 import { PanelCard } from "../components/common/panel-card";
 import { fetchPresets, fetchRuntimeDiagnostics } from "../services/diagnostics-api";
-import { diagnosticsStore, selectDiagnosticsItems, useDiagnosticsStore } from "../store/diagnostics-store";
+import { diagnosticsStore, formatDiagnosticsStatus, selectDiagnosticsItems, useDiagnosticsStore } from "../store/diagnostics-store";
 
 const modeCards = [
   {
     href: "/character",
-    title: "Realtime Character Preview",
-    summary: "Separate browser-camera preview lane for checking character replacement before saved-video render work.",
-    status: "Connected",
-    highlights: ["Preset selection", "Camera stream", "Preview only"],
+    title: "실시간 캐릭터 프리뷰",
+    summary: "저장 영상 렌더 전에 브라우저 카메라로 캐릭터 대체 결과를 확인하는 독립 프리뷰 화면입니다.",
+    status: "연결됨",
+    highlights: ["프리셋 선택", "카메라 스트림", "프리뷰 전용"],
   },
   {
     href: "/privacy",
-    title: "Realtime Privacy Preview",
-    summary: "Camera preview lane for blur policy checks and allowlist behavior before the saved-video workflow.",
-    status: "Connected",
-    highlights: ["Blur policy toggles", "Allowlist status", "Prompt groundwork"],
+    title: "실시간 프라이버시 프리뷰",
+    summary: "저장 영상 작업 전에 블러 정책과 허용 목록 동작을 카메라로 점검하는 화면입니다.",
+    status: "연결됨",
+    highlights: ["블러 정책", "허용 목록 상태", "프롬프트 기반 준비"],
   },
   {
     href: "/video",
-    title: "Saved Video Review",
-    summary: "Upload media, inspect detected candidates, choose preserve/character/blur render mode, and download the result.",
-    status: "Connected",
-    highlights: ["Candidate analysis", "Review render modes", "Result download"],
+    title: "저장 영상 리뷰",
+    summary: "영상을 업로드하고 후보 얼굴을 검토한 뒤 보존/캐릭터/블러 렌더 결과를 다운로드합니다.",
+    status: "연결됨",
+    highlights: ["후보 분석", "리뷰 렌더 모드", "결과 다운로드"],
   },
 ] as const;
 
@@ -50,7 +50,7 @@ export default function HomePage() {
         setPresetCount(presets.length);
       } catch (error) {
         if (!cancelled) {
-          diagnosticsStore.setError(error instanceof Error ? error.message : "overview 초기 데이터를 가져오지 못했습니다.");
+          diagnosticsStore.setError(error instanceof Error ? error.message : "개요 초기 데이터를 가져오지 못했습니다.");
         }
       }
     };
@@ -68,10 +68,10 @@ export default function HomePage() {
 
   const summaryRows = useMemo(
     () => [
-      ["API status", diagnosticsSnapshot.apiStatus],
-      ["GPU status", diagnosticsSnapshot.gpuStatus],
-      ["Runtime status", diagnosticsSnapshot.runtimeStatus],
-      ["Presets loaded", presetCount === null ? "—" : `${presetCount}`],
+      ["API 상태", formatDiagnosticsStatus(diagnosticsSnapshot.apiStatus)],
+      ["GPU 상태", formatDiagnosticsStatus(diagnosticsSnapshot.gpuStatus)],
+      ["런타임 상태", formatDiagnosticsStatus(diagnosticsSnapshot.runtimeStatus)],
+      ["불러온 프리셋", presetCount === null ? "-" : `${presetCount}`],
     ],
     [diagnosticsSnapshot.apiStatus, diagnosticsSnapshot.gpuStatus, diagnosticsSnapshot.runtimeStatus, presetCount],
   );
@@ -79,14 +79,14 @@ export default function HomePage() {
   return (
     <AppShell
       currentRoute="overview"
-      title="Overview"
-      description="Backend-connected dashboard for saved-video privacy review with realtime preview lanes kept separate."
+      title="개요"
+      description="저장 영상 프라이버시 리뷰를 중심으로, 실시간 프리뷰 화면을 분리해 운영하는 대시보드입니다."
       diagnosticsItems={diagnosticsItems}
       activePreset={diagnosticsSnapshot.currentPreset}
-      lastError={diagnosticsSnapshot.lastError ?? "No recent runtime errors."}
+      lastError={diagnosticsSnapshot.lastError ?? "최근 런타임 오류가 없습니다."}
     >
       <div className="stack-lg">
-        <PanelCard kicker="Summary" title="System readiness at a glance" description="Live runtime and preset metadata surfaced as clean, glanceable tiles." tone="accent">
+        <PanelCard kicker="요약" title="시스템 준비 상태" description="런타임과 프리셋 정보를 한눈에 읽기 쉬운 카드로 정리했습니다." tone="accent">
           <div className="summary-grid">
             {summaryRows.map(([label, value]) => (
               <div key={label} className="field-tile">
@@ -97,25 +97,25 @@ export default function HomePage() {
           </div>
         </PanelCard>
 
-        <section aria-label="Mode entry" className="dashboard-grid">
+        <section aria-label="모드 진입" className="dashboard-grid">
           {modeCards.map((card) => (
             <ModeCard key={card.href} {...card} />
           ))}
         </section>
 
         <div className="auto-grid">
-          <PanelCard kicker="Operational notes" title="What to verify first" description="Quick checks before entering each workflow so the UI feels guided rather than mechanical.">
+          <PanelCard kicker="운영 메모" title="먼저 확인할 것" description="각 흐름에 들어가기 전 확인할 핵심 항목을 정리했습니다.">
             <ul className="notes-list">
-              <li>Saved video review is the main product flow; realtime pages are preview and calibration lanes.</li>
-              <li>Preserve and character modes rely on the allowlist policy to decide which face stays visible or gets replaced.</li>
-              <li>Candidate analysis prepares reviewable face crops before render jobs.</li>
+              <li>저장 영상 리뷰가 핵심 제품 흐름이며, 실시간 화면은 프리뷰와 보정 용도입니다.</li>
+              <li>보존/캐릭터 모드는 허용 목록 정책을 기준으로 남길 얼굴과 대체할 얼굴을 판단합니다.</li>
+              <li>후보 분석은 렌더 작업 전에 검토 가능한 얼굴 crop을 준비합니다.</li>
             </ul>
           </PanelCard>
-          <PanelCard kicker="Recommended first run" title="Fast smoke-test path" description="A simple operator flow to confirm the full product loop is healthy.">
+          <PanelCard kicker="첫 실행 추천" title="빠른 스모크 테스트" description="전체 제품 루프가 정상인지 확인하는 간단한 운영 흐름입니다.">
             <ol className="ordered-list">
-              <li>Check <code>/api/v1/health</code> and <code>/api/v1/diagnostics/runtime</code>.</li>
-              <li>Run candidate analysis on a sample video and inspect extracted face crops.</li>
-              <li>Render the sample in preserve or character mode and confirm the completed result download.</li>
+              <li><code>/api/v1/health</code>와 <code>/api/v1/diagnostics/runtime</code>를 확인합니다.</li>
+              <li>샘플 영상으로 후보 분석을 실행하고 추출된 얼굴 crop을 확인합니다.</li>
+              <li>샘플을 보존 또는 캐릭터 모드로 렌더하고 완료 결과 다운로드를 확인합니다.</li>
             </ol>
           </PanelCard>
         </div>

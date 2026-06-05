@@ -35,7 +35,7 @@ export function PrivacyWorkspace() {
   const camera = useCameraStream();
   const realtimeSession = useRealtimeSession({
     mode: "privacy",
-    presetLabel: "Privacy Balanced",
+    presetLabel: "프라이버시 기본",
     streamProfile: DEFAULT_STREAM_PROFILE,
     privacyOptions,
   });
@@ -76,7 +76,7 @@ export function PrivacyWorkspace() {
         }
       } catch (error) {
         if (!cancelled) {
-          diagnosticsStore.setError(error instanceof Error ? error.message : "diagnostics를 가져오지 못했습니다.");
+          diagnosticsStore.setError(error instanceof Error ? error.message : "진단 정보를 가져오지 못했습니다.");
         }
       }
     };
@@ -93,7 +93,7 @@ export function PrivacyWorkspace() {
   }, []);
 
   useEffect(() => {
-    diagnosticsStore.setSessionContext({ mode: "privacy", presetLabel: "Privacy Balanced" });
+    diagnosticsStore.setSessionContext({ mode: "privacy", presetLabel: "프라이버시 기본" });
   }, []);
 
   return (

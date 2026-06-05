@@ -17,17 +17,17 @@ type CandidateReviewBoardProps = {
 };
 
 const actionLabels: Record<CandidateAction, string> = {
-  preserve: "Preserve",
-  character: "Character",
-  blur: "Blur",
-  track: "Track",
+  preserve: "보존",
+  character: "캐릭터",
+  blur: "블러",
+  track: "추적",
 };
 
 const actionDescriptions: Record<CandidateAction, string> = {
-  preserve: "Keep visible",
-  character: "Replace face",
-  blur: "Redact face",
-  track: "Audit across frames",
+  preserve: "이 얼굴 유지",
+  character: "얼굴 대체",
+  blur: "얼굴 가림",
+  track: "프레임 추적",
 };
 
 const actionOrder: CandidateAction[] = ["preserve", "character", "blur", "track"];
@@ -55,17 +55,17 @@ export function CandidateReviewBoard({
   const selectedCount = Object.keys(actions).length;
 
   return (
-    <section className="candidate-board" aria-label="Candidate review board">
+    <section className="candidate-board" aria-label="후보 리뷰 보드">
       <div className="candidate-board__header">
         <div className="stack-xs">
-          <p className="eyebrow">Candidate Review Board</p>
-          <h3 className="surface-heading">Identity decisions before render</h3>
+          <p className="eyebrow">후보 리뷰 보드</p>
+          <h3 className="surface-heading">렌더 전 인물 처리 결정</h3>
         </div>
         <div className="cluster">
-          <StatusBadge label={`${candidateCount} candidates`} tone={candidateCount > 0 ? "success" : "neutral"} />
-          <StatusBadge label={`${selectedCount} decisions`} tone={selectedCount > 0 ? "warning" : "neutral"} />
+          <StatusBadge label={`후보 ${candidateCount}개`} tone={candidateCount > 0 ? "success" : "neutral"} />
+          <StatusBadge label={`결정 ${selectedCount}개`} tone={selectedCount > 0 ? "warning" : "neutral"} />
           <Button disabled={!canAnalyze || disabled} onClick={() => void onAnalyze()} variant="primary" size="sm">
-            {isAnalyzing ? "Analyzing" : "Analyze faces"}
+            {isAnalyzing ? "분석 중" : "얼굴 분석"}
           </Button>
         </div>
       </div>
@@ -85,25 +85,25 @@ export function CandidateReviewBoard({
             return (
               <article key={candidate.candidate_id} className={`candidate-card candidate-card--${selectedAction}`}>
                 <div className="candidate-card__media">
-                  <Image src={candidate.image_url} alt={`Candidate ${index + 1}`} width={180} height={180} unoptimized />
+                  <Image src={candidate.image_url} alt={`후보 ${index + 1}`} width={180} height={180} unoptimized />
                   <div className="candidate-card__index">{String(index + 1).padStart(2, "0")}</div>
                 </div>
 
                 <div className="candidate-card__body">
                   <div className="cluster-between">
                     <div className="stack-xs">
-                      <h4>Candidate {index + 1}</h4>
-                      <p>Frame {candidate.frame_index}</p>
+                      <h4>후보 {index + 1}</h4>
+                      <p>프레임 {candidate.frame_index}</p>
                     </div>
                     <StatusBadge label={actionLabels[selectedAction]} tone={getActionTone(selectedAction)} />
                   </div>
 
-                  <div className="candidate-card__metrics" aria-label={`Candidate ${index + 1} metadata`}>
-                    <span>Confidence {Math.round(candidate.confidence * 100)}%</span>
+                  <div className="candidate-card__metrics" aria-label={`후보 ${index + 1} 메타데이터`}>
+                    <span>신뢰도 {Math.round(candidate.confidence * 100)}%</span>
                     <span>{candidate.bbox.join(", ")}</span>
                   </div>
 
-                  <div className="candidate-action-grid" role="group" aria-label={`Candidate ${index + 1} action`}>
+                  <div className="candidate-action-grid" role="group" aria-label={`후보 ${index + 1} 처리 방식`}>
                     {actionOrder.map((action) => (
                       <button
                         key={action}
@@ -131,10 +131,10 @@ export function CandidateReviewBoard({
       ) : (
         <div className="candidate-board__empty">
           {isAnalyzing
-            ? "Reading sampled frames and preparing candidate crops."
+            ? "샘플 프레임을 읽고 후보 얼굴 crop을 준비하고 있습니다."
             : analysis
-              ? "No reviewable face candidates were detected in the sampled frames."
-              : "Run candidate analysis after choosing a video file."}
+              ? "샘플 프레임에서 검토 가능한 얼굴 후보를 찾지 못했습니다."
+              : "영상을 선택한 뒤 후보 분석을 실행하세요."}
         </div>
       )}
     </section>

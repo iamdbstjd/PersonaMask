@@ -6,11 +6,11 @@ import Link from "next/link";
 import { DiagnosticsRail, type DiagnosticItem } from "../diagnostics/diagnostics-rail";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Overview", routeKey: "overview" },
-  { href: "/character", label: "Character", routeKey: "character" },
-  { href: "/privacy", label: "Privacy", routeKey: "privacy" },
-  { href: "/video", label: "Video Review", routeKey: "video" },
-  { href: "/settings", label: "Settings", routeKey: "settings" },
+  { href: "/", label: "개요", routeKey: "overview" },
+  { href: "/character", label: "캐릭터", routeKey: "character" },
+  { href: "/privacy", label: "프라이버시", routeKey: "privacy" },
+  { href: "/video", label: "영상 리뷰", routeKey: "video" },
+  { href: "/settings", label: "설정", routeKey: "settings" },
 ] as const;
 
 export type AppRouteKey = (typeof NAV_ITEMS)[number]["routeKey"];
@@ -32,8 +32,8 @@ export function AppShell({
   description,
   children,
   diagnosticsItems,
-  activePreset = "None selected",
-  lastError = "No recent runtime errors.",
+  activePreset = "선택된 프리셋 없음",
+  lastError = "최근 런타임 오류가 없습니다.",
   sideContent,
 }: AppShellProps) {
   const currentNav = NAV_ITEMS.find((item) => item.routeKey === currentRoute);
@@ -43,9 +43,9 @@ export function AppShell({
       <header className="shell-topbar">
         <div className="shell-topbar__inner">
           <Link href="/" className="brand-pill">
-            PersonaMask Console
+            PersonaMask 콘솔
           </Link>
-          <nav className="top-nav" aria-label="Primary">
+          <nav className="top-nav" aria-label="주요 화면">
             {NAV_ITEMS.map((item) => {
               const isActive = item.routeKey === currentRoute;
               return (
@@ -59,16 +59,16 @@ export function AppShell({
               );
             })}
           </nav>
-          <div className="top-actions" aria-label="Utility actions">
-            <button type="button" className="top-action" aria-label="Notifications">
+          <div className="top-actions" aria-label="보조 작업">
+            <button type="button" className="top-action" aria-label="알림">
               <span className="top-action__icon top-action__icon--bell" aria-hidden="true" />
             </button>
-            <button type="button" className="top-action" aria-label="Help">
+            <button type="button" className="top-action" aria-label="도움말">
               <span className="top-action__icon top-action__icon--help" aria-hidden="true">
                 ?
               </span>
             </button>
-            <span className="avatar-chip" aria-label="PersonaMask operator">
+            <span className="avatar-chip" aria-label="PersonaMask 운영자">
               <span aria-hidden="true">PM</span>
             </span>
           </div>
@@ -78,11 +78,11 @@ export function AppShell({
       <div className="page-shell__inner">
         <section className="page-intro">
           <div className="page-intro__copy">
-            <p className="eyebrow">Realtime media workflow</p>
+            <p className="eyebrow">실시간 미디어 작업 흐름</p>
             <h1>{title}</h1>
             <p className="hero-card__description">{description}</p>
 
-            <nav className="nav-pills" aria-label="Section navigation">
+            <nav className="nav-pills" aria-label="섹션 이동">
               {NAV_ITEMS.map((item) => {
                 const isActive = item.routeKey === currentRoute;
                 return (
@@ -100,11 +100,11 @@ export function AppShell({
 
           <div className="hero-card__meta">
             <div className="field-tile">
-              <p className="field-tile__label">Current mode</p>
+              <p className="field-tile__label">현재 모드</p>
               <p className="field-tile__value">{currentNav?.label ?? currentRoute}</p>
             </div>
             <div className="field-tile">
-              <p className="field-tile__label">Active preset</p>
+              <p className="field-tile__label">활성 프리셋</p>
               <p className="field-tile__value">{activePreset}</p>
             </div>
           </div>
@@ -125,7 +125,7 @@ export function AppShell({
       </div>
 
       <footer className="app-footer">
-        © 2024 PersonaMask Console · Security-grade Video Processing Interface
+        © 2024 PersonaMask 콘솔 · 보안 등급 영상 처리 인터페이스
       </footer>
     </div>
   );

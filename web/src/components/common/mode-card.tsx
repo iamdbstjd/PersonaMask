@@ -25,7 +25,7 @@ export function ModeCard({ href, title, summary, status, highlights }: ModeCardP
         <p className="mode-card__meta">{highlights.join(" · ")}</p>
 
         <div className="mode-card__footer">
-          <span>Open workflow</span>
+          <span>작업 화면 열기</span>
           <span aria-hidden="true">→</span>
         </div>
       </article>

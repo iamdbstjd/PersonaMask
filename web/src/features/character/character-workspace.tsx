@@ -45,7 +45,7 @@ export function CharacterWorkspace() {
   const realtimeSession = useRealtimeSession({
     mode: "character",
     presetId: selectedPreset?.presetId ?? undefined,
-    presetLabel: selectedPreset?.label ?? "Preset not selected",
+    presetLabel: selectedPreset?.label ?? "프리셋 미선택",
     streamProfile: DEFAULT_STREAM_PROFILE,
     privacyOptions: CHARACTER_PRIVACY_OPTIONS,
   });
@@ -86,7 +86,7 @@ export function CharacterWorkspace() {
         }
       } catch (error) {
         if (!cancelled) {
-          diagnosticsStore.setError(error instanceof Error ? error.message : "diagnostics를 가져오지 못했습니다.");
+          diagnosticsStore.setError(error instanceof Error ? error.message : "진단 정보를 가져오지 못했습니다.");
         }
       }
     };
@@ -102,7 +102,7 @@ export function CharacterWorkspace() {
         setSelectedPresetId((previous) => previous ?? items[0]?.presetId ?? null);
       } catch (error) {
         if (!cancelled) {
-          diagnosticsStore.setError(error instanceof Error ? error.message : "preset 목록을 가져오지 못했습니다.");
+          diagnosticsStore.setError(error instanceof Error ? error.message : "프리셋 목록을 가져오지 못했습니다.");
         }
       } finally {
         if (!cancelled) {
@@ -127,7 +127,7 @@ export function CharacterWorkspace() {
   useEffect(() => {
     diagnosticsStore.setSessionContext({
       mode: "character",
-      presetLabel: selectedPreset?.label ?? "Preset not selected",
+      presetLabel: selectedPreset?.label ?? "프리셋 미선택",
     });
   }, [selectedPreset?.label]);
 
@@ -135,14 +135,14 @@ export function CharacterWorkspace() {
     <section className="workspace-layout workspace-layout--three">
       <div className="stack-md">
         <PanelCard
-          kicker="Preset selector"
-          title="Character presets"
+          kicker="프리셋 선택"
+          title="캐릭터 프리셋"
           description="세션 시작 전에 사용할 프리셋을 조용한 리스트 형태로 정리했습니다."
         >
           <div className="stack-md">
             <div className="cluster">
-              <StatusBadge label={isPresetLoading ? "Loading presets" : `${presets.length} presets`} tone={isPresetLoading ? "warning" : "success"} />
-              <StatusBadge label={selectedPreset ? `Selected · ${selectedPreset.label}` : "Preset required"} tone={selectedPreset ? "success" : "warning"} />
+              <StatusBadge label={isPresetLoading ? "프리셋 로딩 중" : `프리셋 ${presets.length}개`} tone={isPresetLoading ? "warning" : "success"} />
+              <StatusBadge label={selectedPreset ? `선택됨 · ${selectedPreset.label}` : "프리셋 필요"} tone={selectedPreset ? "success" : "warning"} />
             </div>
 
             <div className="selection-list">
@@ -156,7 +156,7 @@ export function CharacterWorkspace() {
                     className={["selection-card", active ? "selection-card--active" : null].filter(Boolean).join(" ")}
                   >
                     <strong>{preset.label}</strong>
-                    <span className="selection-card__meta">preset_id: {preset.presetId}</span>
+                    <span className="selection-card__meta">프리셋 ID: {preset.presetId}</span>
                   </button>
                 );
               })}
@@ -181,7 +181,7 @@ export function CharacterWorkspace() {
           processedFrameSrc={sessionSnapshot.processedFrameSrc}
           detections={sessionSnapshot.lastDetectionCounts}
           latencyMs={sessionSnapshot.lastServerLatencyMs}
-          afterTitle="Character preview"
+          afterTitle="캐릭터 프리뷰"
           afterDescription="선택한 프리셋 기준으로 백엔드 처리된 캐릭터 프리뷰가 매끄럽게 갱신됩니다."
           afterEmptyLabel="세션을 시작하면 캐릭터 프리뷰가 이 영역에 표시됩니다."
         />

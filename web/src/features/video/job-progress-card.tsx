@@ -24,27 +24,41 @@ function getStatusTone(status: VideoJobUiStatus): "neutral" | "success" | "warni
   }
 }
 
+function formatVideoStatus(status: VideoJobUiStatus): string {
+  const labels: Record<VideoJobUiStatus, string> = {
+    idle: "대기",
+    uploading: "업로드 중",
+    queued: "대기열 등록",
+    processing: "처리 중",
+    completed: "완료",
+    failed: "실패",
+    cancelled: "취소됨",
+  };
+
+  return labels[status];
+}
+
 export function JobProgressCard({ jobId, status, progress }: JobProgressCardProps) {
   const metrics = [
-    { label: "Percent", value: progress ? `${progress.percent}%` : "—" },
-    { label: "Processed", value: progress ? `${progress.processed_frames}` : "—" },
-    { label: "Total frames", value: progress ? `${progress.total_frames}` : "—" },
-    { label: "ETA", value: progress ? `${progress.eta_sec}s` : "—" },
+    { label: "진행률", value: progress ? `${progress.percent}%` : "-" },
+    { label: "처리 프레임", value: progress ? `${progress.processed_frames}` : "-" },
+    { label: "전체 프레임", value: progress ? `${progress.total_frames}` : "-" },
+    { label: "예상 시간", value: progress ? `${progress.eta_sec}초` : "-" },
   ];
 
   return (
     <section className="stack-md">
       <div className="cluster-between">
         <div className="stack-xs">
-          <p className="eyebrow">Polling snapshot</p>
-          <h3 style={{ margin: 0, fontSize: "1.12rem", letterSpacing: "-0.02em" }}>Live job progress</h3>
+          <p className="eyebrow">폴링 스냅샷</p>
+          <h3 style={{ margin: 0, fontSize: "1.12rem", letterSpacing: "-0.02em" }}>실시간 작업 진행률</h3>
         </div>
-        <StatusBadge label={`State · ${status}`} tone={getStatusTone(status)} />
+        <StatusBadge label={`상태 · ${formatVideoStatus(status)}`} tone={getStatusTone(status)} />
       </div>
 
       <div className="field-tile">
-        <p className="field-tile__label">Job id</p>
-        <p className="field-tile__value">{jobId ?? "No job created yet"}</p>
+        <p className="field-tile__label">작업 ID</p>
+        <p className="field-tile__value">{jobId ?? "아직 생성된 작업이 없습니다"}</p>
       </div>
 
       <div className="metrics-grid">
