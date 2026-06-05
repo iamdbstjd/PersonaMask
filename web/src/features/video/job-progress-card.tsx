@@ -33,27 +33,25 @@ export function JobProgressCard({ jobId, status, progress }: JobProgressCardProp
   ];
 
   return (
-    <section style={{ display: "grid", gap: "0.9rem" }}>
-      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: "0.75rem" }}>
-        <div>
-          <p style={{ margin: 0, color: "#6b7280", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-            JobProgressCard
-          </p>
-          <h3 style={{ margin: "0.35rem 0 0", fontSize: "1.05rem", color: "#111827" }}>Polling snapshot</h3>
+    <section className="stack-md">
+      <div className="cluster-between">
+        <div className="stack-xs">
+          <p className="eyebrow">Polling snapshot</p>
+          <h3 style={{ margin: 0, fontSize: "1.12rem", letterSpacing: "-0.02em" }}>Live job progress</h3>
         </div>
         <StatusBadge label={`State · ${status}`} tone={getStatusTone(status)} />
       </div>
 
-      <div style={{ borderRadius: "16px", backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", padding: "0.95rem" }}>
-        <p style={{ margin: 0, color: "#475569", fontSize: "0.9rem" }}>Job id</p>
-        <p style={{ margin: "0.3rem 0 0", color: "#111827", fontWeight: 700 }}>{jobId ?? "No job created yet"}</p>
+      <div className="field-tile">
+        <p className="field-tile__label">Job id</p>
+        <p className="field-tile__value">{jobId ?? "No job created yet"}</p>
       </div>
 
-      <div style={{ display: "grid", gap: "0.75rem", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))" }}>
+      <div className="metrics-grid">
         {metrics.map((metric) => (
-          <div key={metric.label} style={{ borderTop: "1px solid #e5e7eb", paddingTop: "0.75rem" }}>
-            <p style={{ margin: 0, color: "#6b7280", fontSize: "0.85rem" }}>{metric.label}</p>
-            <p style={{ margin: "0.35rem 0 0", color: "#111827", fontWeight: 700 }}>{metric.value}</p>
+          <div key={metric.label} className="field-tile">
+            <p className="field-tile__label">{metric.label}</p>
+            <p className="field-tile__value">{metric.value}</p>
           </div>
         ))}
       </div>

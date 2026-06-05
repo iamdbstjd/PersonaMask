@@ -6,8 +6,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
-VideoJobMode = Literal["video_privacy"]
+VideoJobMode = Literal["video_privacy", "blur", "preserve", "character"]
 VideoJobStatus = Literal["queued", "processing", "completed", "failed", "cancelled"]
+CandidateAction = Literal["preserve", "character", "blur", "track"]
 
 
 class VideoPrivacyOptions(BaseModel):
@@ -20,11 +21,14 @@ class VideoPrivacyOptions(BaseModel):
 class VideoOutputOptions(BaseModel):
     container: str = "mp4"
     video_codec: str = "h264"
-    keep_audio: bool = True
+    keep_audio: bool = False
 
 
 class VideoJobCreateRequest(BaseModel):
-    mode: VideoJobMode = "video_privacy"
+    mode: VideoJobMode = "blur"
+    character_id: str | None = None
+    analysis_id: str | None = None
+    candidate_actions: dict[str, CandidateAction] = Field(default_factory=dict)
     privacy_options: VideoPrivacyOptions = Field(default_factory=VideoPrivacyOptions)
     output_options: VideoOutputOptions = Field(default_factory=VideoOutputOptions)
 
@@ -39,6 +43,10 @@ class VideoJobProgress(BaseModel):
 class VideoJobResult(BaseModel):
     download_url: str
     preview_thumbnail_url: str | None = None
+    contact_sheet_url: str | None = None
+    qa_report_json_url: str | None = None
+    qa_report_markdown_url: str | None = None
+    qa_summary: dict[str, Any] | None = None
     expires_at: datetime | None = None
 
 
@@ -54,6 +62,20 @@ class VideoJobCreateData(BaseModel):
     status: VideoJobStatus
     status_endpoint: str
     cancel_endpoint: str
+
+
+class VideoFaceCandidateData(BaseModel):
+    candidate_id: str
+    image_url: str
+    frame_index: int
+    bbox: list[int]
+    confidence: float = 1.0
+
+
+class VideoCandidateAnalysisData(BaseModel):
+    analysis_id: str
+    source_filename: str
+    candidates: list[VideoFaceCandidateData]
 
 
 class ApiEnvelope(BaseModel):

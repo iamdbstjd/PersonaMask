@@ -1,6 +1,7 @@
 "use client";
 
 import type { RealtimeUiState } from "../../store/session-store";
+import { Button } from "../../components/common/button";
 import { PanelCard } from "../../components/common/panel-card";
 import { StatusBadge } from "../../components/common/status-badge";
 
@@ -14,16 +15,6 @@ type CharacterSessionControlCardProps = {
   onStartSession: () => void;
   onStopSession: () => void;
 };
-
-const BUTTON_STYLE = {
-  borderRadius: "999px",
-  border: "1px solid #d1d5db",
-  backgroundColor: "#ffffff",
-  color: "#111827",
-  padding: "0.65rem 0.95rem",
-  fontWeight: 600,
-  cursor: "pointer",
-} as const;
 
 export function CharacterSessionControlCard({
   status,
@@ -42,10 +33,11 @@ export function CharacterSessionControlCard({
     <PanelCard
       kicker="Character session"
       title="Realtime controls"
-      description="프리셋 선택 + 카메라 준비가 완료되면 캐릭터 세션을 시작해 프레임 처리를 연결합니다."
+      description="프리셋 선택과 카메라 준비가 끝나면 바로 캐릭터 세션을 시작하고, 문제 생기면 빠르게 정지할 수 있게 구성했습니다."
+      tone="accent"
     >
-      <div style={{ display: "grid", gap: "0.9rem" }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+      <div className="stack-md">
+        <div className="cluster">
           <StatusBadge
             label={`State · ${status}`}
             tone={status === "streaming" ? "success" : status === "error" ? "danger" : status === "degraded" ? "warning" : "neutral"}
@@ -55,23 +47,23 @@ export function CharacterSessionControlCard({
           <StatusBadge label={isUploading ? "Uploading frames" : "Upload idle"} tone={isUploading ? "success" : "neutral"} />
         </div>
 
-        <div style={{ display: "grid", gap: "0.35rem", color: "#4b5563", lineHeight: 1.6 }}>
-          <span>Session id: {sessionId ?? "—"}</span>
-          <span>캐릭터 모드는 `preset_id`가 필수이므로 세션 시작 전 프리셋을 반드시 선택하세요.</span>
+        <div className="field-grid">
+          <div className="field-tile">
+            <p className="field-tile__label">Session id</p>
+            <p className="field-tile__value">{sessionId ?? "—"}</p>
+          </div>
+          <p className="field-note" style={{ margin: 0 }}>
+            캐릭터 모드는 <code>preset_id</code>가 필수이므로 세션 시작 전에 프리셋을 반드시 선택하세요.
+          </p>
         </div>
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-          <button type="button" onClick={onStartSession} disabled={!canStart} style={BUTTON_STYLE}>
+        <div className="cluster">
+          <Button onClick={onStartSession} disabled={!canStart} variant="primary">
             {isBusy && !sessionId ? "Starting…" : "Start character session"}
-          </button>
-          <button
-            type="button"
-            onClick={onStopSession}
-            disabled={!canStop}
-            style={{ ...BUTTON_STYLE, backgroundColor: "#111827", color: "#ffffff", borderColor: "#111827" }}
-          >
+          </Button>
+          <Button onClick={onStopSession} disabled={!canStop} variant="secondary">
             {isBusy && sessionId ? "Stopping…" : "Stop session"}
-          </button>
+          </Button>
         </div>
       </div>
     </PanelCard>

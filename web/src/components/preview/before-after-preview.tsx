@@ -24,8 +24,8 @@ export function BeforeAfterPreview({
   afterEmptyLabel = "세션을 시작하면 처리된 프리뷰가 이 영역에 표시됩니다.",
 }: BeforeAfterPreviewProps) {
   return (
-    <div style={{ display: "grid", gap: "1rem" }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+    <div className="stack-md">
+      <div className="cluster">
         <StatusBadge label={latencyMs === null ? "Latency · —" : `Latency · ${latencyMs} ms`} tone={latencyMs && latencyMs > 180 ? "warning" : "neutral"} />
         <StatusBadge
           label={detections ? `Faces ${detections.facesRedacted}/${detections.facesTotal}` : "Faces · —"}
@@ -41,7 +41,7 @@ export function BeforeAfterPreview({
         />
       </div>
 
-      <div style={{ display: "grid", gap: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+      <div className="preview-grid">
         <PreviewFrame
           kicker="Before"
           title="Input frame"

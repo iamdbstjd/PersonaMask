@@ -13,23 +13,14 @@ type PreviewFrameProps = {
 
 export function PreviewFrame({ title, kicker, description, imageSrc, emptyLabel }: PreviewFrameProps) {
   return (
-    <PanelCard kicker={kicker} title={title} description={description}>
-      <div
-        style={{
-          position: "relative",
-          minHeight: "240px",
-          borderRadius: "16px",
-          overflow: "hidden",
-          border: "1px solid #dbeafe",
-          background: imageSrc ? "#eff6ff" : "#f8fafc",
-          display: "grid",
-          placeItems: "center",
-        }}
-      >
+    <PanelCard kicker={kicker} title={title} description={description} tone="accent">
+      <div className="preview-frame">
         {imageSrc ? (
           <Image src={imageSrc} alt={title} fill unoptimized style={{ objectFit: "cover", display: "block" }} />
         ) : (
-          <span style={{ color: "#64748b", padding: "1rem", textAlign: "center", lineHeight: 1.6 }}>{emptyLabel}</span>
+          <div className="preview-placeholder">
+            <span>{emptyLabel}</span>
+          </div>
         )}
       </div>
     </PanelCard>

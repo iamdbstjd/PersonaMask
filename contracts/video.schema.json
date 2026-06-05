@@ -14,6 +14,9 @@
       "$ref": "#/$defs/VideoJobConfig"
     },
     {
+      "$ref": "#/$defs/VideoCandidateAnalysisResponse"
+    },
+    {
       "$ref": "#/$defs/VideoJobCreateResponse"
     },
     {
@@ -92,8 +95,35 @@
         "mode": {
           "type": "string",
           "enum": [
-            "video_privacy"
+            "video_privacy",
+            "blur",
+            "preserve",
+            "character"
           ]
+        },
+        "character_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "analysis_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "candidate_actions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "preserve",
+              "character",
+              "blur",
+              "track"
+            ]
+          }
         },
         "privacy_options": {
           "$ref": "#/$defs/PrivacyOptions"
@@ -150,6 +180,82 @@
         }
       }
     },
+    "VideoFaceCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "image_url",
+        "frame_index",
+        "bbox",
+        "confidence"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string"
+        },
+        "image_url": {
+          "type": "string"
+        },
+        "frame_index": {
+          "type": "integer"
+        },
+        "bbox": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "confidence": {
+          "type": "number"
+        }
+      }
+    },
+    "VideoCandidateAnalysisData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "analysis_id",
+        "source_filename",
+        "candidates"
+      ],
+      "properties": {
+        "analysis_id": {
+          "type": "string"
+        },
+        "source_filename": {
+          "type": "string"
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/VideoFaceCandidate"
+          }
+        }
+      }
+    },
+    "VideoCandidateAnalysisResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "data",
+        "error"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/VideoCandidateAnalysisData"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
     "JobProgress": {
       "type": "object",
       "additionalProperties": false,
@@ -180,6 +286,10 @@
       "required": [
         "download_url",
         "preview_thumbnail_url",
+        "contact_sheet_url",
+        "qa_report_json_url",
+        "qa_report_markdown_url",
+        "qa_summary",
         "expires_at"
       ],
       "properties": {
@@ -187,11 +297,75 @@
           "type": "string"
         },
         "preview_thumbnail_url": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contact_sheet_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "qa_report_json_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "qa_report_markdown_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "qa_summary": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/VideoQaSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "expires_at": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "date-time"
+        }
+      }
+    },
+    "VideoQaSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "processed_frames",
+        "detection_totals",
+        "average_blur_reduction_pct",
+        "suspect_frame_count"
+      ],
+      "properties": {
+        "processed_frames": {
+          "type": "integer"
+        },
+        "detection_totals": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "average_blur_reduction_pct": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "suspect_frame_count": {
+          "type": "integer"
         }
       }
     },

@@ -1,42 +1,13 @@
 "use client";
 
-import { StatusBadge } from "../../components/common/status-badge";
-import { DEFAULT_VIDEO_JOB_CONFIG, type PrivacyOptions, type VideoJobConfig } from "../../services/video-api";
-
-type ToggleRowProps = {
-  label: string;
-  description: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (checked: boolean) => void;
-};
-
-function ToggleRow({ label, description, checked, disabled = false, onChange }: ToggleRowProps) {
-  return (
-    <label
-      style={{
-        display: "grid",
-        gridTemplateColumns: "auto minmax(0, 1fr)",
-        gap: "0.75rem",
-        alignItems: "start",
-        padding: "0.8rem",
-        borderRadius: "14px",
-        border: "1px solid #e5e7eb",
-        backgroundColor: checked ? "#f8fafc" : "#ffffff",
-      }}
-    >
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
-      <span>
-        <strong style={{ color: "#111827" }}>{label}</strong>
-        <span style={{ display: "block", marginTop: "0.3rem", color: "#4b5563", lineHeight: 1.5 }}>{description}</span>
-      </span>
-    </label>
-  );
-}
+import { Button } from "../../components/common/button";
+import { ToggleCard } from "../../components/common/toggle-card";
+import { DEFAULT_VIDEO_JOB_CONFIG, type PrivacyOptions, type VideoJobConfig, type VideoJobProcessingMode } from "../../services/video-api";
 
 type VideoConfigPanelProps = {
   config: VideoJobConfig;
   disabled?: boolean;
+  onModeChange: (mode: VideoJobProcessingMode) => void;
   onPrivacyOptionChange: (option: keyof PrivacyOptions, value: boolean) => void;
   onKeepAudioChange: (value: boolean) => void;
   onResetDefaults: () => void;
@@ -45,45 +16,56 @@ type VideoConfigPanelProps = {
 export function VideoConfigPanel({
   config,
   disabled = false,
+  onModeChange,
   onPrivacyOptionChange,
   onKeepAudioChange,
   onResetDefaults,
 }: VideoConfigPanelProps) {
   return (
-    <section style={{ display: "grid", gap: "1rem" }}>
-      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: "0.75rem" }}>
-        <div>
-          <p style={{ margin: 0, color: "#6b7280", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-            VideoConfigPanel
-          </p>
-          <h3 style={{ margin: "0.35rem 0 0", fontSize: "1.05rem", color: "#111827" }}>Privacy batch configuration</h3>
-        </div>
-        <StatusBadge label={`Mode · ${config.mode}`} tone="neutral" />
+    <section className="stack-md">
+      <div className="segmented-control" role="group" aria-label="Video processing mode">
+        {[
+          { mode: "preserve" as const, label: "Preserve allowed" },
+          { mode: "character" as const, label: "Character replace" },
+          { mode: "blur" as const, label: "Blur all" },
+        ].map((item) => (
+          <button
+            key={item.mode}
+            type="button"
+            className={["segmented-control__button", config.mode === item.mode ? "segmented-control__button--active" : null]
+              .filter(Boolean)
+              .join(" ")}
+            disabled={disabled}
+            onClick={() => onModeChange(item.mode)}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
-      <div style={{ display: "grid", gap: "0.75rem" }}>
-        <ToggleRow
+      <div className="stack-sm">
+        <ToggleCard
           label="Blur faces"
           description="Default-on redaction for detected faces in every processed frame."
           checked={config.privacy_options.blur_faces}
           disabled={disabled}
           onChange={(checked) => onPrivacyOptionChange("blur_faces", checked)}
         />
-        <ToggleRow
+        <ToggleCard
           label="Blur license plates"
           description="Keep plate protection aligned with the privacy mode contract."
           checked={config.privacy_options.blur_plates}
           disabled={disabled}
           onChange={(checked) => onPrivacyOptionChange("blur_plates", checked)}
         />
-        <ToggleRow
+        <ToggleCard
           label="Blur text"
           description="Redact visible text overlays and signage during batch processing."
           checked={config.privacy_options.blur_text}
           disabled={disabled}
           onChange={(checked) => onPrivacyOptionChange("blur_text", checked)}
         />
-        <ToggleRow
+        <ToggleCard
           label="Allowlist aware"
           description="Respect allowlisted identities when the backend policy supports it."
           checked={config.privacy_options.allowlist_enabled}
@@ -92,41 +74,28 @@ export function VideoConfigPanel({
         />
       </div>
 
-      <div style={{ display: "grid", gap: "0.75rem", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-        <div style={{ borderRadius: "14px", border: "1px solid #e5e7eb", padding: "0.85rem", backgroundColor: "#ffffff" }}>
-          <p style={{ margin: 0, color: "#6b7280", fontSize: "0.85rem" }}>Container</p>
-          <p style={{ margin: "0.3rem 0 0", color: "#111827", fontWeight: 700 }}>{config.output_options.container}</p>
+      <div className="summary-grid">
+        <div className="field-tile">
+          <p className="field-tile__label">Container</p>
+          <p className="field-tile__value">{config.output_options.container}</p>
         </div>
-        <div style={{ borderRadius: "14px", border: "1px solid #e5e7eb", padding: "0.85rem", backgroundColor: "#ffffff" }}>
-          <p style={{ margin: 0, color: "#6b7280", fontSize: "0.85rem" }}>Codec</p>
-          <p style={{ margin: "0.3rem 0 0", color: "#111827", fontWeight: 700 }}>{config.output_options.video_codec}</p>
+        <div className="field-tile">
+          <p className="field-tile__label">Codec</p>
+          <p className="field-tile__value">{config.output_options.video_codec}</p>
         </div>
-        <ToggleRow
-          label="Keep audio"
-          description="Preserve the original audio track in the rendered artifact."
-          checked={config.output_options.keep_audio}
-          disabled={disabled}
-          onChange={onKeepAudioChange}
-        />
       </div>
 
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={onResetDefaults}
-        style={{
-          width: "fit-content",
-          borderRadius: "999px",
-          border: "1px solid #d1d5db",
-          backgroundColor: "#ffffff",
-          color: "#111827",
-          fontWeight: 600,
-          padding: "0.65rem 0.95rem",
-          cursor: disabled ? "not-allowed" : "pointer",
-        }}
-      >
+      <ToggleCard
+        label="Audio passthrough"
+        description="Current OpenCV renderer outputs a video-only MP4; audio passthrough is reserved for the FFmpeg lane."
+        checked={false}
+        disabled
+        onChange={onKeepAudioChange}
+      />
+
+      <Button onClick={onResetDefaults} disabled={disabled} variant="ghost" size="sm">
         Reset to defaults ({DEFAULT_VIDEO_JOB_CONFIG.output_options.container}/{DEFAULT_VIDEO_JOB_CONFIG.output_options.video_codec})
-      </button>
+      </Button>
     </section>
   );
 }

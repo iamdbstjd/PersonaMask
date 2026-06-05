@@ -231,7 +231,7 @@ paths:
   /api/v1/videos/jobs:
     post:
       tags: [videos]
-      summary: Create a batch privacy video job.
+      summary: Create a saved-video privacy review render job.
       operationId: createVideoJob
       requestBody:
         required: true
@@ -258,6 +258,62 @@ paths:
               schema:
                 $ref: '#/components/schemas/VideoJobCreateResponse'
         '400':
+          $ref: '#/components/responses/ApiError'
+
+  /api/v1/videos/candidates:
+    post:
+      tags: [videos]
+      summary: Upload a video and extract reviewable face candidates.
+      operationId: createVideoCandidates
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Candidate analysis result
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoCandidateAnalysisResponse'
+        '400':
+          $ref: '#/components/responses/ApiError'
+
+  /api/v1/videos/candidates/{analysis_id}/{candidate_id}:
+    get:
+      tags: [videos]
+      summary: Download a candidate face crop for review.
+      operationId: downloadVideoCandidate
+      parameters:
+        - name: analysis_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: candidate_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Candidate face image
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        '404':
           $ref: '#/components/responses/ApiError'
 
   /api/v1/videos/jobs/{job_id}:
@@ -302,6 +358,77 @@ paths:
               schema:
                 type: string
                 format: binary
+        '404':
+          $ref: '#/components/responses/ApiError'
+
+  /api/v1/videos/jobs/{job_id}/thumbnail:
+    get:
+      tags: [videos]
+      summary: Download the completed video job thumbnail.
+      operationId: downloadVideoJobThumbnail
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Result thumbnail image
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/ApiError'
+
+  /api/v1/videos/jobs/{job_id}/contact-sheet:
+    get:
+      tags: [videos]
+      summary: Download before/after redaction contact sheet.
+      operationId: downloadVideoJobContactSheet
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Before/after contact sheet image
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/ApiError'
+
+  /api/v1/videos/jobs/{job_id}/qa-report.json:
+    get:
+      tags: [videos]
+      summary: Download the machine-readable redaction QA report.
+      operationId: downloadVideoJobQaReportJson
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Redaction QA report JSON
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          $ref: '#/components/responses/ApiError'
+
+  /api/v1/videos/jobs/{job_id}/qa-report.md:
+    get:
+      tags: [videos]
+      summary: Download the human-readable redaction QA report.
+      operationId: downloadVideoJobQaReportMarkdown
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Redaction QA report Markdown
+          content:
+            text/markdown:
+              schema:
+                type: string
         '404':
           $ref: '#/components/responses/ApiError'
 
@@ -656,11 +783,62 @@ components:
       properties:
         mode:
           type: string
-          enum: [video_privacy]
+          enum: [video_privacy, blur, preserve, character]
+        character_id:
+          type: string
+        analysis_id:
+          type:
+            - string
+            - 'null'
+        candidate_actions:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [preserve, character, blur, track]
         privacy_options:
           $ref: '#/components/schemas/PrivacyOptions'
         output_options:
           $ref: '#/components/schemas/OutputOptions'
+
+    VideoFaceCandidate:
+      type: object
+      required: [candidate_id, image_url, frame_index, bbox, confidence]
+      properties:
+        candidate_id:
+          type: string
+        image_url:
+          type: string
+        frame_index:
+          type: integer
+        bbox:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            type: integer
+        confidence:
+          type: number
+
+    VideoCandidateAnalysisResponse:
+      type: object
+      required: [request_id, data, error]
+      properties:
+        request_id:
+          type: string
+        data:
+          type: object
+          required: [analysis_id, source_filename, candidates]
+          properties:
+            analysis_id:
+              type: string
+            source_filename:
+              type: string
+            candidates:
+              type: array
+              items:
+                $ref: '#/components/schemas/VideoFaceCandidate'
+        error:
+          type: 'null'
 
     VideoJobCreateResponse:
       type: object
@@ -704,9 +882,42 @@ components:
         download_url:
           type: string
         preview_thumbnail_url:
-          type: string
+          type:
+            - string
+            - 'null'
+        contact_sheet_url:
+          type:
+            - string
+            - 'null'
+        qa_report_json_url:
+          type:
+            - string
+            - 'null'
+        qa_report_markdown_url:
+          type:
+            - string
+            - 'null'
+        qa_summary:
+          type:
+            - object
+            - 'null'
+          properties:
+            processed_frames:
+              type: integer
+            detection_totals:
+              type: object
+              additionalProperties:
+                type: integer
+            average_blur_reduction_pct:
+              type:
+                - number
+                - 'null'
+            suspect_frame_count:
+              type: integer
         expires_at:
-          type: string
+          type:
+            - string
+            - 'null'
           format: date-time
 
     VideoJobStatusResponse:

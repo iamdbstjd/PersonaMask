@@ -53,21 +53,21 @@ function isStepReached(activeStatus: VideoJobUiStatus, stepStatus: TimelineStep[
 function getAccent(status: VideoJobUiStatus, step: TimelineStep["key"]): { dot: string; border: string; text: string } {
   if (status === step) {
     if (step === "failed") {
-      return { dot: "#b91c1c", border: "#fecaca", text: "#7f1d1d" };
+      return { dot: "#b91c1c", border: "rgba(248, 113, 113, 0.24)", text: "#7f1d1d" };
     }
 
     if (step === "cancelled") {
-      return { dot: "#92400e", border: "#fcd34d", text: "#78350f" };
+      return { dot: "#b45309", border: "rgba(245, 158, 11, 0.24)", text: "#92400e" };
     }
 
-    return { dot: "#2563eb", border: "#bfdbfe", text: "#1d4ed8" };
+    return { dot: "#2563eb", border: "rgba(96, 165, 250, 0.24)", text: "#1d4ed8" };
   }
 
   if (isStepReached(status, step)) {
-    return { dot: "#059669", border: "#a7f3d0", text: "#065f46" };
+    return { dot: "#059669", border: "rgba(5, 150, 105, 0.22)", text: "#047857" };
   }
 
-  return { dot: "#cbd5e1", border: "#e5e7eb", text: "#64748b" };
+  return { dot: "#cbd5e1", border: "rgba(148, 163, 184, 0.22)", text: "#64748b" };
 }
 
 type JobTimelineProps = {
@@ -75,38 +75,19 @@ type JobTimelineProps = {
 };
 
 export function JobTimeline({ status }: JobTimelineProps) {
+  const visibleSteps = status === "idle" ? TIMELINE_STEPS.slice(0, 2) : TIMELINE_STEPS;
+
   return (
-    <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: "0.75rem" }}>
-      {TIMELINE_STEPS.map((step) => {
+    <ol className="timeline-list" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+      {visibleSteps.map((step) => {
         const accent = getAccent(status, step.key);
 
         return (
-          <li
-            key={step.key}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "auto minmax(0, 1fr)",
-              gap: "0.75rem",
-              alignItems: "start",
-              borderRadius: "14px",
-              border: `1px solid ${accent.border}`,
-              backgroundColor: "#ffffff",
-              padding: "0.85rem",
-            }}
-          >
-            <span
-              aria-hidden="true"
-              style={{
-                width: "0.8rem",
-                height: "0.8rem",
-                borderRadius: "999px",
-                backgroundColor: accent.dot,
-                marginTop: "0.35rem",
-              }}
-            />
+          <li key={step.key} className="timeline-item" style={{ borderColor: accent.border }}>
+            <span className="timeline-dot" style={{ backgroundColor: accent.dot }} aria-hidden="true" />
             <div>
               <strong style={{ color: accent.text }}>{step.label}</strong>
-              <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6 }}>{step.description}</p>
+              <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.7 }}>{step.description}</p>
             </div>
           </li>
         );

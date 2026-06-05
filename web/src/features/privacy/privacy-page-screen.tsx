@@ -12,8 +12,8 @@ export function PrivacyPageScreen() {
   return (
     <AppShell
       currentRoute="privacy"
-      title="Privacy Blur Mode"
-      description="The privacy flow prioritizes policy confidence with before/after comparison, allowlist awareness, and conservative warning surfaces."
+      title="Realtime Privacy Preview"
+      description="Camera preview lane for blur policy checks, allowlist behavior, and future prompt handling before saved-video rendering."
       diagnosticsItems={diagnosticsItems}
       activePreset={diagnosticsSnapshot.currentPreset}
       lastError={diagnosticsSnapshot.lastError ?? "No recent runtime errors."}

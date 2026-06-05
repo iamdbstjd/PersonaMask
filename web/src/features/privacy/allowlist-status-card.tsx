@@ -12,21 +12,26 @@ type AllowlistStatusCardProps = {
 export function AllowlistStatusCard({ allowlistEnabled, apiStatus, queueDepth }: AllowlistStatusCardProps) {
   return (
     <PanelCard
-      kicker="AllowlistStatusCard"
-      title="Allowlist readiness"
-      description="worker-3 allowlist API가 연결되면 여기에서 예외 규칙 상태를 즉시 확인할 수 있도록 준비합니다."
+      kicker="Allowlist readiness"
+      title="Allowlist sync status"
+      description="허용 얼굴 정책이 켜져 있는지, 백엔드 상태가 안정적인지, 처리 여유가 있는지 빠르게 읽을 수 있습니다."
+      tone="accent"
     >
-      <div style={{ display: "grid", gap: "0.75rem" }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+      <div className="stack-md">
+        <div className="cluster">
           <StatusBadge label={allowlistEnabled ? "Allowlist active" : "Allowlist disabled"} tone={allowlistEnabled ? "success" : "warning"} />
           <StatusBadge label={`API · ${apiStatus}`} tone={apiStatus.toLowerCase().includes("healthy") ? "success" : "neutral"} />
         </div>
-        <p style={{ margin: 0, color: "#4b5563", lineHeight: 1.6 }}>
-          허용 얼굴 목록 CRUD는 별도 lane이 연결하면 이 카드에서 item count와 최근 동기화 시간을 보여줄 수 있습니다.
-        </p>
-        <p style={{ margin: 0, color: "#4b5563", lineHeight: 1.6 }}>
-          현재 queue depth: <strong>{queueDepth === null ? "—" : queueDepth}</strong>
-        </p>
+
+        <div className="field-grid">
+          <div className="field-tile">
+            <p className="field-tile__label">Current queue depth</p>
+            <p className="field-tile__value">{queueDepth === null ? "—" : queueDepth}</p>
+          </div>
+          <p className="field-note" style={{ margin: 0 }}>
+            허용 얼굴 목록 CRUD가 연결되면 이 카드에서 item count와 최근 동기화 시간을 바로 보여주도록 확장할 수 있습니다.
+          </p>
+        </div>
       </div>
     </PanelCard>
   );

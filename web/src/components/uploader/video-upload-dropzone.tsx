@@ -51,7 +51,7 @@ export function VideoUploadDropzone({
   };
 
   return (
-    <div style={{ display: "grid", gap: "0.85rem" }}>
+    <div className="stack-sm">
       <label
         htmlFor={inputId}
         onDragOver={(event) => {
@@ -62,16 +62,8 @@ export function VideoUploadDropzone({
         }}
         onDragLeave={() => onDragActiveChange?.(false)}
         onDrop={handleDrop}
-        style={{
-          display: "grid",
-          gap: "0.85rem",
-          borderRadius: "18px",
-          border: `1px dashed ${dragActive ? "#2563eb" : "#cbd5e1"}`,
-          backgroundColor: dragActive ? "#eff6ff" : "#f8fafc",
-          padding: "1rem",
-          cursor: disabled ? "not-allowed" : "pointer",
-          opacity: disabled ? 0.7 : 1,
-        }}
+        className={["dropzone", dragActive ? "dropzone--active" : null].filter(Boolean).join(" ")}
+        style={{ cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.72 : 1 }}
       >
         <input
           id={inputId}
@@ -82,35 +74,27 @@ export function VideoUploadDropzone({
           style={{ display: "none" }}
         />
 
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: "0.75rem" }}>
-          <div>
-            <p style={{ margin: 0, color: "#111827", fontWeight: 700 }}>Drop a source video or browse local files</p>
-            <p style={{ margin: "0.35rem 0 0", color: "#4b5563", lineHeight: 1.6 }}>{helperText}</p>
+        <div className="cluster-between">
+          <div className="stack-xs">
+            <span className="dropzone__icon" aria-hidden="true">Upload</span>
+            <p style={{ margin: 0, color: "#0f172a", fontWeight: 800, fontSize: "1.02rem" }}>
+              Drop a source video or browse local files
+            </p>
+            <p className="field-note" style={{ margin: 0 }}>{helperText}</p>
           </div>
           <StatusBadge label={dragActive ? "Drop now" : "Ready"} tone={dragActive ? "warning" : "success"} />
         </div>
 
-        <div
-          style={{
-            borderRadius: "14px",
-            backgroundColor: "#ffffff",
-            border: "1px solid #e5e7eb",
-            padding: "0.9rem",
-            minHeight: "96px",
-            display: "grid",
-            alignContent: "center",
-            gap: "0.4rem",
-          }}
-        >
+        <div className="dropzone__file">
           {file ? (
             <>
-              <strong style={{ color: "#111827" }}>{file.name}</strong>
-              <span style={{ color: "#4b5563", fontSize: "0.9rem" }}>{formatFileSize(file.size)}</span>
+              <strong style={{ color: "#0f172a" }}>{file.name}</strong>
+              <span className="text-muted" style={{ fontSize: "0.92rem" }}>{formatFileSize(file.size)}</span>
             </>
           ) : (
             <>
-              <strong style={{ color: "#111827" }}>No file selected</strong>
-              <span style={{ color: "#4b5563", fontSize: "0.9rem" }}>
+              <strong style={{ color: "#0f172a" }}>No file selected</strong>
+              <span className="text-muted" style={{ fontSize: "0.92rem" }}>
                 Upload state remains separate from job polling so operators can leave the page after submission.
               </span>
             </>
@@ -119,7 +103,7 @@ export function VideoUploadDropzone({
       </label>
 
       {errorMessage ? (
-        <p style={{ margin: 0, color: "#b91c1c", fontSize: "0.9rem", lineHeight: 1.5 }}>{errorMessage}</p>
+        <p style={{ margin: 0, color: "#b91c1c", fontSize: "0.9rem", lineHeight: 1.6 }}>{errorMessage}</p>
       ) : null}
     </div>
   );

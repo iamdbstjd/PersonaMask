@@ -4,13 +4,12 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { DiagnosticsRail, type DiagnosticItem } from "../diagnostics/diagnostics-rail";
-import { StatusBadge } from "./status-badge";
 
 const NAV_ITEMS = [
   { href: "/", label: "Overview", routeKey: "overview" },
   { href: "/character", label: "Character", routeKey: "character" },
   { href: "/privacy", label: "Privacy", routeKey: "privacy" },
-  { href: "/video", label: "Video", routeKey: "video" },
+  { href: "/video", label: "Video Review", routeKey: "video" },
   { href: "/settings", label: "Settings", routeKey: "settings" },
 ] as const;
 
@@ -24,6 +23,7 @@ type AppShellProps = {
   diagnosticsItems: readonly DiagnosticItem[];
   activePreset?: string;
   lastError?: string;
+  sideContent?: ReactNode;
 };
 
 export function AppShell({
@@ -34,110 +34,99 @@ export function AppShell({
   diagnosticsItems,
   activePreset = "None selected",
   lastError = "No recent runtime errors.",
+  sideContent,
 }: AppShellProps) {
   const currentNav = NAV_ITEMS.find((item) => item.routeKey === currentRoute);
-  const latencyLabel = diagnosticsItems.find((item) => item.label === "Latency")?.value ?? "—";
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background:
-          "linear-gradient(180deg, #f8fafc 0%, #f8fafc 52%, #ffffff 100%)",
-        color: "#111827",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "1440px",
-          margin: "0 auto",
-          padding: "1.5rem",
-          display: "grid",
-          gap: "1.5rem",
-        }}
-      >
-        <header
-          style={{
-            border: "1px solid #e5e7eb",
-            borderRadius: "24px",
-            backgroundColor: "rgba(255, 255, 255, 0.88)",
-            backdropFilter: "blur(12px)",
-            padding: "1.25rem",
-            boxShadow: "0 16px 40px rgba(15, 23, 42, 0.04)",
-          }}
-        >
-          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: "1rem" }}>
-            <div>
-              <p style={{ margin: "0 0 0.4rem", color: "#6b7280", fontSize: "0.85rem" }}>Realtime Operator Console</p>
-              <h1 style={{ margin: 0, fontSize: "1.85rem" }}>{title}</h1>
-              <p style={{ margin: "0.6rem 0 0", maxWidth: "60ch", color: "#4b5563", lineHeight: 1.6 }}>{description}</p>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem", alignContent: "flex-start" }}>
-              <StatusBadge label={`Route · ${currentNav?.label ?? currentRoute}`} tone="neutral" />
-              <StatusBadge label="API connected" tone="success" />
-              <StatusBadge label={`Latency · ${latencyLabel}`} tone="warning" />
-            </div>
-          </div>
-
-          <nav
-            aria-label="Primary"
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "0.75rem",
-              marginTop: "1rem",
-            }}
-          >
+    <div className="page-shell">
+      <header className="shell-topbar">
+        <div className="shell-topbar__inner">
+          <Link href="/" className="brand-pill">
+            PersonaMask Console
+          </Link>
+          <nav className="top-nav" aria-label="Primary">
             {NAV_ITEMS.map((item) => {
               const isActive = item.routeKey === currentRoute;
               return (
                 <Link
                   key={item.routeKey}
                   href={item.href}
-                  style={{
-                    borderRadius: "999px",
-                    padding: "0.65rem 0.95rem",
-                    textDecoration: "none",
-                    fontWeight: 600,
-                    border: `1px solid ${isActive ? "#111827" : "#d1d5db"}`,
-                    backgroundColor: isActive ? "#111827" : "#ffffff",
-                    color: isActive ? "#ffffff" : "#111827",
-                  }}
+                  className={["top-nav__link", isActive ? "top-nav__link--active" : null].filter(Boolean).join(" ")}
                 >
                   {item.label}
                 </Link>
               );
             })}
           </nav>
-        </header>
-
-        <div
-          style={{
-            display: "grid",
-            gap: "1.5rem",
-            gridTemplateColumns: "minmax(0, 1fr)",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gap: "1.5rem",
-              alignItems: "start",
-              gridTemplateColumns: "minmax(0, 1fr)",
-            }}
-          >
-            <main style={{ minWidth: 0 }}>{children}</main>
-            <aside style={{ minWidth: 0 }}>
-              <DiagnosticsRail
-                items={diagnosticsItems}
-                activeMode={currentNav?.label ?? currentRoute}
-                activePreset={activePreset}
-                lastError={lastError}
-              />
-            </aside>
+          <div className="top-actions" aria-label="Utility actions">
+            <button type="button" className="top-action" aria-label="Notifications">
+              <span className="top-action__icon top-action__icon--bell" aria-hidden="true" />
+            </button>
+            <button type="button" className="top-action" aria-label="Help">
+              <span className="top-action__icon top-action__icon--help" aria-hidden="true">
+                ?
+              </span>
+            </button>
+            <span className="avatar-chip" aria-label="PersonaMask operator">
+              <span aria-hidden="true">PM</span>
+            </span>
           </div>
         </div>
+      </header>
+
+      <div className="page-shell__inner">
+        <section className="page-intro">
+          <div className="page-intro__copy">
+            <p className="eyebrow">Realtime media workflow</p>
+            <h1>{title}</h1>
+            <p className="hero-card__description">{description}</p>
+
+            <nav className="nav-pills" aria-label="Section navigation">
+              {NAV_ITEMS.map((item) => {
+                const isActive = item.routeKey === currentRoute;
+                return (
+                  <Link
+                    key={item.routeKey}
+                    href={item.href}
+                    className={["nav-pill", isActive ? "nav-pill--active" : null].filter(Boolean).join(" ")}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+
+          <div className="hero-card__meta">
+            <div className="field-tile">
+              <p className="field-tile__label">Current mode</p>
+              <p className="field-tile__value">{currentNav?.label ?? currentRoute}</p>
+            </div>
+            <div className="field-tile">
+              <p className="field-tile__label">Active preset</p>
+              <p className="field-tile__value">{activePreset}</p>
+            </div>
+          </div>
+        </section>
+
+        <div className="content-layout">
+          <main>{children}</main>
+          <aside className="content-aside sticky-card">
+            {sideContent}
+            <DiagnosticsRail
+              items={diagnosticsItems}
+              activeMode={currentNav?.label ?? currentRoute}
+              activePreset={activePreset}
+              lastError={lastError}
+            />
+          </aside>
+        </div>
       </div>
+
+      <footer className="app-footer">
+        © 2024 PersonaMask Console · Security-grade Video Processing Interface
+      </footer>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { API_BASE_PATH } from "./api-client";
 
 export const VIDEO_JOB_BASE_PATH = `${API_BASE_PATH}/videos/jobs`;
+export const VIDEO_CANDIDATE_BASE_PATH = `${API_BASE_PATH}/videos/candidates`;
 
 export type VideoJobUiStatus =
   | "idle"
@@ -12,6 +13,8 @@ export type VideoJobUiStatus =
   | "cancelled";
 
 export type VideoJobServerStatus = Exclude<VideoJobUiStatus, "idle" | "uploading">;
+export type VideoJobProcessingMode = "video_privacy" | "blur" | "preserve" | "character";
+export type CandidateAction = "preserve" | "character" | "blur" | "track";
 
 export type PrivacyOptions = {
   blur_faces: boolean;
@@ -27,7 +30,10 @@ export type OutputOptions = {
 };
 
 export type VideoJobConfig = {
-  mode: "video_privacy";
+  mode: VideoJobProcessingMode;
+  character_id?: string | null;
+  analysis_id?: string | null;
+  candidate_actions?: Record<string, CandidateAction>;
   privacy_options: PrivacyOptions;
   output_options: OutputOptions;
 };
@@ -41,8 +47,17 @@ export type VideoJobProgress = {
 
 export type VideoJobResult = {
   download_url: string;
-  preview_thumbnail_url: string;
-  expires_at: string;
+  preview_thumbnail_url: string | null;
+  contact_sheet_url?: string | null;
+  qa_report_json_url?: string | null;
+  qa_report_markdown_url?: string | null;
+  qa_summary?: {
+    processed_frames?: number;
+    detection_totals?: Record<string, number>;
+    average_blur_reduction_pct?: number | null;
+    suspect_frame_count?: number;
+  } | null;
+  expires_at: string | null;
 };
 
 export type VideoJobCreateData = {
@@ -82,20 +97,43 @@ export type VideoJobCancelResponse = {
   error: null;
 };
 
+export type VideoFaceCandidate = {
+  candidate_id: string;
+  image_url: string;
+  frame_index: number;
+  bbox: [number, number, number, number];
+  confidence: number;
+};
+
+export type VideoCandidateAnalysisData = {
+  analysis_id: string;
+  source_filename: string;
+  candidates: VideoFaceCandidate[];
+};
+
+export type VideoCandidateAnalysisResponse = {
+  request_id: string;
+  data: VideoCandidateAnalysisData;
+  error: null;
+};
+
 export type FetchLike = typeof fetch;
 
 export const DEFAULT_VIDEO_JOB_CONFIG: VideoJobConfig = {
-  mode: "video_privacy",
+  mode: "blur",
+  character_id: "spider",
+  analysis_id: null,
+  candidate_actions: {},
   privacy_options: {
     blur_faces: true,
     blur_plates: true,
     blur_text: true,
-    allowlist_enabled: true,
+    allowlist_enabled: false,
   },
   output_options: {
     container: "mp4",
     video_codec: "h264",
-    keep_audio: true,
+    keep_audio: false,
   },
 };
 
@@ -170,6 +208,21 @@ export function getVideoJobCancelUrl(jobId: string): string {
 
 export function getVideoJobResultUrl(jobId: string): string {
   return `${getVideoJobStatusUrl(jobId)}/result`;
+}
+
+export async function analyzeVideoCandidates(file: File, fetchImpl: FetchLike = fetch): Promise<VideoCandidateAnalysisData> {
+  const formData = new FormData();
+  formData.set("file", file);
+  const response = await requestJson<VideoCandidateAnalysisResponse>(
+    VIDEO_CANDIDATE_BASE_PATH,
+    {
+      method: "POST",
+      body: formData,
+    },
+    fetchImpl,
+  );
+
+  return response.data;
 }
 
 export async function createVideoJob(

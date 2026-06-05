@@ -2,45 +2,41 @@
 
 import type { ReactNode } from "react";
 
+type PanelTone = "default" | "accent" | "contrast";
+
 type PanelCardProps = {
   title: string;
   description?: string;
   kicker?: string;
   children?: ReactNode;
+  tone?: PanelTone;
+  className?: string;
 };
 
-export function PanelCard({ title, description, kicker, children }: PanelCardProps) {
+export function PanelCard({
+  title,
+  description,
+  kicker,
+  children,
+  tone = "default",
+  className,
+}: PanelCardProps) {
+  const classes = [
+    "panel-card",
+    tone !== "default" ? `panel-card--${tone}` : null,
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <section
-      style={{
-        border: "1px solid #e5e7eb",
-        borderRadius: "18px",
-        backgroundColor: "#ffffff",
-        padding: "1.25rem",
-        boxShadow: "0 12px 30px rgba(15, 23, 42, 0.04)",
-      }}
-    >
-      <header style={{ marginBottom: children ? "1rem" : 0 }}>
-        {kicker ? (
-          <p
-            style={{
-              margin: "0 0 0.4rem",
-              color: "#4b5563",
-              fontSize: "0.75rem",
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-            }}
-          >
-            {kicker}
-          </p>
-        ) : null}
-        <h2 style={{ margin: 0, fontSize: "1.05rem", color: "#111827" }}>{title}</h2>
-        {description ? (
-          <p style={{ margin: "0.5rem 0 0", color: "#4b5563", lineHeight: 1.6 }}>{description}</p>
-        ) : null}
+    <section className={classes}>
+      <header className="panel-card__header" style={{ marginBottom: children ? "1rem" : 0 }}>
+        {kicker ? <p className="panel-card__kicker">{kicker}</p> : null}
+        <h2 className="panel-card__title">{title}</h2>
+        {description ? <p className="panel-card__description">{description}</p> : null}
       </header>
-      {children}
+      {children ? <div className="panel-card__content">{children}</div> : null}
     </section>
   );
 }

@@ -44,6 +44,7 @@ class ProcessingResult:
     image_bgr: np.ndarray
     detections: ProcessingDetections
     primary_face: FaceBox | None
+    redacted_regions: tuple[FaceBox, ...] = ()
 
 
 StyleTransformer = Callable[[np.ndarray], np.ndarray]
@@ -184,6 +185,7 @@ def apply_privacy_effects(
     faces = detect_faces(output)
     primary = _largest_face(faces)
     faces_redacted = 0
+    redacted_regions: list[FaceBox] = []
 
     if blur_faces:
         for face in faces:
@@ -191,16 +193,19 @@ def apply_privacy_effects(
                 continue
             _blur_region(output, face)
             faces_redacted += 1
+            redacted_regions.append(face)
 
     plate_boxes = _detect_plate_candidates(image_bgr) if blur_plates else []
     for plate in plate_boxes:
         _blur_region(output, plate)
+        redacted_regions.append(plate)
 
     text_regions_redacted = 0
     if blur_text:
         height, width = output.shape[:2]
         text_band = FaceBox(x1=0, y1=0, x2=width, y2=max(1, int(height * 0.16)))
         _blur_region(output, text_band)
+        redacted_regions.append(text_band)
         text_regions_redacted = 1
 
     return ProcessingResult(
@@ -212,6 +217,7 @@ def apply_privacy_effects(
             text_regions_redacted=text_regions_redacted,
         ),
         primary_face=primary,
+        redacted_regions=tuple(redacted_regions),
     )
 
 
@@ -245,18 +251,74 @@ def _draw_anime_overlay(image_bgr: np.ndarray) -> np.ndarray:
     return cv2.bitwise_and(color, color, mask=edges)
 
 
+def _style_transformer(preset_id: str | None) -> StyleTransformer:
+    preset = (preset_id or "spider").lower()
+    if preset == "bat":
+        return _draw_bat_overlay
+    if preset in {"anime", "anime_mask"}:
+        return _draw_anime_overlay
+    return _draw_spider_overlay
+
+
+def apply_video_review_effects(
+    image_bgr: np.ndarray,
+    *,
+    mode: str,
+    blur_faces: bool,
+    blur_plates: bool,
+    blur_text: bool,
+    allowlist_enabled: bool,
+    character_id: str | None = None,
+) -> ProcessingResult:
+    review_mode = "blur" if mode == "video_privacy" else mode
+    output = image_bgr.copy()
+    faces = detect_faces(output)
+    primary = _largest_face(faces)
+    reference_face = primary if allowlist_enabled and primary is not None else None
+    faces_redacted = 0
+    redacted_regions: list[FaceBox] = []
+
+    if blur_faces:
+        for face in faces:
+            if reference_face is not None and face == reference_face and review_mode in {"preserve", "character"}:
+                continue
+            _blur_region(output, face)
+            faces_redacted += 1
+            redacted_regions.append(face)
+
+    if review_mode == "character" and reference_face is not None:
+        output = _apply_face_transform(output, reference_face, _style_transformer(character_id))
+
+    plate_boxes = _detect_plate_candidates(image_bgr) if blur_plates else []
+    for plate in plate_boxes:
+        _blur_region(output, plate)
+        redacted_regions.append(plate)
+
+    text_regions_redacted = 0
+    if blur_text:
+        height, width = output.shape[:2]
+        text_band = FaceBox(x1=0, y1=0, x2=width, y2=max(1, int(height * 0.16)))
+        _blur_region(output, text_band)
+        redacted_regions.append(text_band)
+        text_regions_redacted = 1
+
+    return ProcessingResult(
+        image_bgr=output,
+        detections=ProcessingDetections(
+            faces_total=len(faces),
+            faces_redacted=faces_redacted,
+            plates_redacted=len(plate_boxes),
+            text_regions_redacted=text_regions_redacted,
+        ),
+        primary_face=primary,
+        redacted_regions=tuple(redacted_regions),
+    )
+
+
 def apply_character_effects(image_bgr: np.ndarray, preset_id: str | None) -> ProcessingResult:
     faces = detect_faces(image_bgr)
     primary = _largest_face(faces)
-    preset = (preset_id or "spider").lower()
-
-    transformer: StyleTransformer
-    if preset == "bat":
-        transformer = _draw_bat_overlay
-    elif preset in {"anime", "anime_mask"}:
-        transformer = _draw_anime_overlay
-    else:
-        transformer = _draw_spider_overlay
+    transformer = _style_transformer(preset_id)
 
     if primary is None:
         output = transformer(image_bgr)

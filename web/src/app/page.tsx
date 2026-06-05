@@ -11,24 +11,24 @@ import { diagnosticsStore, selectDiagnosticsItems, useDiagnosticsStore } from ".
 const modeCards = [
   {
     href: "/character",
-    title: "Character Mask Mode",
-    summary: "Preset-first realtime masking flow with large preview and live frame updates.",
+    title: "Realtime Character Preview",
+    summary: "Separate browser-camera preview lane for checking character replacement before saved-video render work.",
     status: "Connected",
-    highlights: ["Preset selection", "Camera stream", "Realtime preview"],
+    highlights: ["Preset selection", "Camera stream", "Preview only"],
   },
   {
     href: "/privacy",
-    title: "Privacy Blur Mode",
-    summary: "Policy-driven before/after review with allowlist awareness and detection summaries.",
+    title: "Realtime Privacy Preview",
+    summary: "Camera preview lane for blur policy checks and allowlist behavior before the saved-video workflow.",
     status: "Connected",
-    highlights: ["Blur policy toggles", "Allowlist status", "Detection counts"],
+    highlights: ["Blur policy toggles", "Allowlist status", "Prompt groundwork"],
   },
   {
     href: "/video",
-    title: "Video Privacy Batch",
-    summary: "Upload, queue tracking, progress polling, and download result orchestration.",
+    title: "Saved Video Review",
+    summary: "Upload media, inspect detected candidates, choose preserve/character/blur render mode, and download the result.",
     status: "Connected",
-    highlights: ["Upload dropzone", "Job timeline", "Result download"],
+    highlights: ["Candidate analysis", "Review render modes", "Result download"],
   },
 ] as const;
 
@@ -80,50 +80,42 @@ export default function HomePage() {
     <AppShell
       currentRoute="overview"
       title="Overview"
-      description="Backend-connected dashboard for runtime readiness and entry points to character/privacy/video workflows."
+      description="Backend-connected dashboard for saved-video privacy review with realtime preview lanes kept separate."
       diagnosticsItems={diagnosticsItems}
       activePreset={diagnosticsSnapshot.currentPreset}
       lastError={diagnosticsSnapshot.lastError ?? "No recent runtime errors."}
     >
-      <div style={{ display: "grid", gap: "1.25rem" }}>
-        <PanelCard kicker="Summary" title="System readiness at a glance" description="Live runtime and preset metadata from backend APIs.">
-          <div style={{ display: "grid", gap: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+      <div className="stack-lg">
+        <PanelCard kicker="Summary" title="System readiness at a glance" description="Live runtime and preset metadata surfaced as clean, glanceable tiles." tone="accent">
+          <div className="summary-grid">
             {summaryRows.map(([label, value]) => (
-              <div key={label} style={{ borderTop: "1px solid #e5e7eb", paddingTop: "0.85rem" }}>
-                <p style={{ margin: 0, color: "#6b7280", fontSize: "0.85rem" }}>{label}</p>
-                <p style={{ margin: "0.35rem 0 0", fontWeight: 700, fontSize: "1.05rem" }}>{value}</p>
+              <div key={label} className="field-tile">
+                <p className="field-tile__label">{label}</p>
+                <p className="field-tile__value">{value}</p>
               </div>
             ))}
           </div>
         </PanelCard>
 
-        <section aria-label="Mode entry" style={{ display: "grid", gap: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+        <section aria-label="Mode entry" className="dashboard-grid">
           {modeCards.map((card) => (
             <ModeCard key={card.href} {...card} />
           ))}
         </section>
 
-        <div style={{ display: "grid", gap: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
-          <PanelCard
-            kicker="Diagnostics"
-            title="Operational notes"
-            description="Quick checks before entering individual realtime or batch pages."
-          >
-            <ul style={{ margin: 0, paddingLeft: "1.1rem", color: "#374151", lineHeight: 1.7 }}>
-              <li>Character mode requires preset selection before session start.</li>
-              <li>Privacy mode keeps before/after preview and detection summary synchronized.</li>
-              <li>Video mode polls queue state until terminal status and then exposes download URL.</li>
+        <div className="auto-grid">
+          <PanelCard kicker="Operational notes" title="What to verify first" description="Quick checks before entering each workflow so the UI feels guided rather than mechanical.">
+            <ul className="notes-list">
+              <li>Saved video review is the main product flow; realtime pages are preview and calibration lanes.</li>
+              <li>Preserve and character modes rely on the allowlist policy to decide which face stays visible or gets replaced.</li>
+              <li>Candidate analysis prepares reviewable face crops before render jobs.</li>
             </ul>
           </PanelCard>
-          <PanelCard
-            kicker="Quick links"
-            title="Recommended first run"
-            description="Start with diagnostics and then verify realtime + batch roundtrip."
-          >
-            <ol style={{ margin: 0, paddingLeft: "1.1rem", color: "#374151", lineHeight: 1.7 }}>
-              <li>Check `/api/v1/health` and `/api/v1/diagnostics/runtime`.</li>
-              <li>Run character session with one preset and verify preview updates.</li>
-              <li>Upload sample video and confirm completed result download.</li>
+          <PanelCard kicker="Recommended first run" title="Fast smoke-test path" description="A simple operator flow to confirm the full product loop is healthy.">
+            <ol className="ordered-list">
+              <li>Check <code>/api/v1/health</code> and <code>/api/v1/diagnostics/runtime</code>.</li>
+              <li>Run candidate analysis on a sample video and inspect extracted face crops.</li>
+              <li>Render the sample in preserve or character mode and confirm the completed result download.</li>
             </ol>
           </PanelCard>
         </div>

@@ -5,10 +5,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DEFAULT_VIDEO_JOB_CONFIG,
   VideoApiError,
+  analyzeVideoCandidates,
+  type CandidateAction,
   type FetchLike,
   type PrivacyOptions,
+  type VideoCandidateAnalysisData,
   type VideoJobConfig,
   type VideoJobCreateData,
+  type VideoJobProcessingMode,
   type VideoJobProgress,
   type VideoJobResult,
   type VideoJobServerStatus,
@@ -41,12 +45,19 @@ export type UseVideoJobResult = {
   dragActive: boolean;
   status: VideoJobUiStatus;
   job: VideoJobSnapshot | null;
+  candidateAnalysis: VideoCandidateAnalysisData | null;
+  candidateActions: Record<string, CandidateAction>;
   lastError: string | null;
+  isAnalyzingCandidates: boolean;
   canSubmit: boolean;
+  canAnalyzeCandidates: boolean;
   canCancel: boolean;
   selectFile: (file: File | null) => void;
   setDragActive: (active: boolean) => void;
+  analyzeCandidates: () => Promise<void>;
+  updateCandidateAction: (candidateId: string, action: CandidateAction) => void;
   updatePrivacyOption: (option: keyof PrivacyOptions, value: boolean) => void;
+  updateMode: (mode: VideoJobProcessingMode) => void;
   updateKeepAudio: (value: boolean) => void;
   resetConfig: () => void;
   submit: () => Promise<void>;
@@ -78,6 +89,20 @@ function toErrorMessage(error: unknown): string {
   return "Unexpected video job error.";
 }
 
+function deriveModeFromActions(actions: Record<string, CandidateAction>, fallback: VideoJobProcessingMode): VideoJobProcessingMode {
+  const values = Object.values(actions);
+  if (values.includes("character")) {
+    return "character";
+  }
+  if (values.includes("preserve") || values.includes("track")) {
+    return "preserve";
+  }
+  if (values.length > 0) {
+    return "blur";
+  }
+  return fallback;
+}
+
 export function useVideoJob({
   fetchImpl = fetch,
   pollIntervalMs = 3000,
@@ -88,6 +113,9 @@ export function useVideoJob({
   const [dragActive, setDragActive] = useState(false);
   const [status, setStatus] = useState<VideoJobUiStatus>("idle");
   const [job, setJob] = useState<VideoJobSnapshot | null>(null);
+  const [candidateAnalysis, setCandidateAnalysis] = useState<VideoCandidateAnalysisData | null>(null);
+  const [candidateActions, setCandidateActions] = useState<Record<string, CandidateAction>>({});
+  const [isAnalyzingCandidates, setIsAnalyzingCandidates] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -141,9 +169,66 @@ export function useVideoJob({
     setSelectedFile(file);
     if (file) {
       setJob(null);
+      setCandidateAnalysis(null);
+      setCandidateActions({});
       setLastError(null);
       setStatus("idle");
+      setConfig((previous) => ({
+        ...previous,
+        analysis_id: null,
+        candidate_actions: {},
+      }));
     }
+  }, []);
+
+  const analyzeCandidates = useCallback(async () => {
+    if (!selectedFile) {
+      setLastError("Choose a video file before running candidate analysis.");
+      return;
+    }
+
+    setIsAnalyzingCandidates(true);
+    setLastError(null);
+    try {
+      const analysis = await analyzeVideoCandidates(selectedFile, fetchImpl);
+      const defaultActions: Record<string, CandidateAction> = Object.fromEntries(
+        analysis.candidates.map((candidate) => [candidate.candidate_id, "blur" as CandidateAction]),
+      );
+      setCandidateAnalysis(analysis);
+      setCandidateActions(defaultActions);
+      setConfig((previous) => ({
+        ...previous,
+        analysis_id: analysis.analysis_id,
+        candidate_actions: defaultActions,
+        mode: deriveModeFromActions(defaultActions, previous.mode),
+        privacy_options: {
+          ...previous.privacy_options,
+          allowlist_enabled: Object.values(defaultActions).some(
+            (value) => value === "preserve" || value === "character" || value === "track",
+          ),
+        },
+      }));
+    } catch (error) {
+      setLastError(toErrorMessage(error));
+    } finally {
+      setIsAnalyzingCandidates(false);
+    }
+  }, [fetchImpl, selectedFile]);
+
+  const updateCandidateAction = useCallback((candidateId: string, action: CandidateAction) => {
+    setCandidateActions((previous) => {
+      const next = { ...previous, [candidateId]: action };
+      setConfig((current) => ({
+        ...current,
+        candidate_actions: next,
+        mode: deriveModeFromActions(next, current.mode),
+        privacy_options: {
+          ...current.privacy_options,
+          allowlist_enabled: Object.values(next).some((value) => value === "preserve" || value === "character" || value === "track"),
+        },
+      }));
+      return next;
+    });
   }, []);
 
   const updatePrivacyOption = useCallback((option: keyof PrivacyOptions, value: boolean) => {
@@ -152,6 +237,17 @@ export function useVideoJob({
       privacy_options: {
         ...previous.privacy_options,
         [option]: value,
+      },
+    }));
+  }, []);
+
+  const updateMode = useCallback((mode: VideoJobProcessingMode) => {
+    setConfig((previous) => ({
+      ...previous,
+      mode,
+      privacy_options: {
+        ...previous.privacy_options,
+        allowlist_enabled: mode !== "blur",
       },
     }));
   }, []);
@@ -167,8 +263,19 @@ export function useVideoJob({
   }, []);
 
   const resetConfig = useCallback(() => {
-    setConfig(initialConfig);
-  }, [initialConfig]);
+    setConfig({
+      ...initialConfig,
+      analysis_id: candidateAnalysis?.analysis_id ?? null,
+      candidate_actions: candidateActions,
+      mode: deriveModeFromActions(candidateActions, initialConfig.mode),
+      privacy_options: {
+        ...initialConfig.privacy_options,
+        allowlist_enabled: Object.values(candidateActions).some(
+          (value) => value === "preserve" || value === "character" || value === "track",
+        ),
+      },
+    });
+  }, [candidateActions, candidateAnalysis?.analysis_id, initialConfig]);
 
   const submit = useCallback(async () => {
     if (!selectedFile) {
@@ -217,9 +324,16 @@ export function useVideoJob({
     setDragActive(false);
     setStatus("idle");
     setJob(null);
+    setCandidateAnalysis(null);
+    setCandidateActions({});
+    setIsAnalyzingCandidates(false);
     setLastError(null);
     setConfig(initialConfig);
   }, [initialConfig]);
+
+  const canAnalyzeCandidates = useMemo(() => {
+    return Boolean(selectedFile) && !isAnalyzingCandidates && status !== "uploading" && status !== "processing" && status !== "queued";
+  }, [isAnalyzingCandidates, selectedFile, status]);
 
   const canSubmit = useMemo(() => {
     return Boolean(selectedFile) && status !== "uploading" && status !== "processing" && status !== "queued";
@@ -235,12 +349,19 @@ export function useVideoJob({
     dragActive,
     status,
     job,
+    candidateAnalysis,
+    candidateActions,
     lastError,
+    isAnalyzingCandidates,
     canSubmit,
+    canAnalyzeCandidates,
     canCancel,
     selectFile,
     setDragActive,
+    analyzeCandidates,
+    updateCandidateAction,
     updatePrivacyOption,
+    updateMode,
     updateKeepAudio,
     resetConfig,
     submit,

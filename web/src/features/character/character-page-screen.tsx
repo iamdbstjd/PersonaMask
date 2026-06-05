@@ -11,8 +11,8 @@ export function CharacterPageScreen() {
   return (
     <AppShell
       currentRoute="character"
-      title="Character Mask Mode"
-      description="Preset-first realtime flow for live camera input and backend-processed character preview."
+      title="Realtime Character Preview"
+      description="Preset-first camera preview lane for checking character replacement behavior before saved-video render work."
       diagnosticsItems={diagnosticsItems}
       activePreset={diagnosticsSnapshot.currentPreset}
       lastError={diagnosticsSnapshot.lastError ?? "No recent runtime errors."}

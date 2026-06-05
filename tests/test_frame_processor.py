@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from app.pipelines.frame_processor import FaceBox, apply_character_effects, apply_privacy_effects
+from app.pipelines.frame_processor import FaceBox, apply_character_effects, apply_privacy_effects, apply_video_review_effects
 
 
 def _random_image(height: int = 160, width: int = 160) -> np.ndarray:
@@ -54,6 +54,45 @@ class FrameProcessorTests(unittest.TestCase):
 
         self.assertIsNone(result.primary_face)
         self.assertFalse(np.array_equal(result.image_bgr, image))
+
+    def test_video_review_modes_blur_or_preserve_reference_face(self) -> None:
+        image = _random_image()
+        primary_face = FaceBox(x1=58, y1=42, x2=126, y2=124)
+        secondary_face = FaceBox(x1=12, y1=22, x2=44, y2=58)
+
+        with patch("app.pipelines.frame_processor.detect_faces", return_value=[primary_face, secondary_face]):
+            blur_result = apply_video_review_effects(
+                image,
+                mode="blur",
+                blur_faces=True,
+                blur_plates=False,
+                blur_text=False,
+                allowlist_enabled=True,
+            )
+            preserve_result = apply_video_review_effects(
+                image,
+                mode="preserve",
+                blur_faces=True,
+                blur_plates=False,
+                blur_text=False,
+                allowlist_enabled=True,
+            )
+            character_result = apply_video_review_effects(
+                image,
+                mode="character",
+                blur_faces=True,
+                blur_plates=False,
+                blur_text=False,
+                allowlist_enabled=True,
+                character_id="spider",
+            )
+
+        self.assertEqual(blur_result.detections.faces_redacted, 2)
+        self.assertFalse(np.array_equal(blur_result.image_bgr[primary_face.y1:primary_face.y2, primary_face.x1:primary_face.x2], image[primary_face.y1:primary_face.y2, primary_face.x1:primary_face.x2]))
+        self.assertEqual(preserve_result.detections.faces_redacted, 1)
+        self.assertTrue(np.array_equal(preserve_result.image_bgr[primary_face.y1:primary_face.y2, primary_face.x1:primary_face.x2], image[primary_face.y1:primary_face.y2, primary_face.x1:primary_face.x2]))
+        self.assertEqual(character_result.detections.faces_redacted, 1)
+        self.assertFalse(np.array_equal(character_result.image_bgr[primary_face.y1:primary_face.y2, primary_face.x1:primary_face.x2], image[primary_face.y1:primary_face.y2, primary_face.x1:primary_face.x2]))
 
 
 if __name__ == "__main__":

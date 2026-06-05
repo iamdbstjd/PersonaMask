@@ -9,7 +9,7 @@ import { BeforeAfterPreview } from "../../components/preview/before-after-previe
 import { useCameraStream } from "../../hooks/useCameraStream";
 import { useFrameUploader } from "../../hooks/useFrameUploader";
 import { useRealtimeSession } from "../../hooks/useRealtimeSession";
-import { diagnosticsStore, selectDiagnosticsItems, useDiagnosticsStore } from "../../store/diagnostics-store";
+import { diagnosticsStore, useDiagnosticsStore } from "../../store/diagnostics-store";
 import { useSessionStore } from "../../store/session-store";
 import { DetectionSummaryCard } from "../privacy/detection-summary-card";
 import { CharacterSessionControlCard } from "./character-session-control-card";
@@ -131,110 +131,85 @@ export function CharacterWorkspace() {
     });
   }, [selectedPreset?.label]);
 
-  const diagnosticsItems = useMemo(() => selectDiagnosticsItems(diagnosticsSnapshot), [diagnosticsSnapshot]);
-
   return (
-    <div style={{ display: "grid", gap: "1rem" }}>
-      <section style={{ display: "grid", gap: "1rem", gridTemplateColumns: "minmax(260px, 320px) minmax(0, 1fr) minmax(260px, 320px)" }}>
-        <div style={{ display: "grid", gap: "1rem", alignSelf: "start" }}>
-          <PanelCard
-            kicker="Preset selector"
-            title="Character presets"
-            description="백엔드 `/presets` 응답을 기반으로 세션 생성에 사용할 프리셋을 선택합니다."
-          >
-            <div style={{ display: "grid", gap: "0.75rem" }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                <StatusBadge label={isPresetLoading ? "Loading presets" : `${presets.length} presets`} tone={isPresetLoading ? "warning" : "success"} />
-                <StatusBadge label={selectedPreset ? `Selected · ${selectedPreset.label}` : "Preset required"} tone={selectedPreset ? "success" : "warning"} />
-              </div>
-
-              <div style={{ display: "grid", gap: "0.6rem" }}>
-                {presets.map((preset) => {
-                  const active = selectedPresetId === preset.presetId;
-                  return (
-                    <button
-                      key={preset.presetId}
-                      type="button"
-                      onClick={() => setSelectedPresetId(preset.presetId)}
-                      style={{
-                        textAlign: "left",
-                        borderRadius: "12px",
-                        border: `1px solid ${active ? "#111827" : "#d1d5db"}`,
-                        backgroundColor: active ? "#111827" : "#ffffff",
-                        color: active ? "#ffffff" : "#111827",
-                        padding: "0.7rem 0.8rem",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <strong>{preset.label}</strong>
-                      <div style={{ fontSize: "0.85rem", opacity: active ? 0.95 : 0.75, marginTop: "0.25rem" }}>
-                        preset_id: {preset.presetId}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+    <section className="workspace-layout workspace-layout--three">
+      <div className="stack-md">
+        <PanelCard
+          kicker="Preset selector"
+          title="Character presets"
+          description="세션 시작 전에 사용할 프리셋을 조용한 리스트 형태로 정리했습니다."
+        >
+          <div className="stack-md">
+            <div className="cluster">
+              <StatusBadge label={isPresetLoading ? "Loading presets" : `${presets.length} presets`} tone={isPresetLoading ? "warning" : "success"} />
+              <StatusBadge label={selectedPreset ? `Selected · ${selectedPreset.label}` : "Preset required"} tone={selectedPreset ? "success" : "warning"} />
             </div>
-          </PanelCard>
-        </div>
 
-        <div style={{ display: "grid", gap: "1rem" }}>
-          <CameraViewport
-            videoRef={camera.videoRef}
-            permission={camera.permission}
-            isStarting={camera.isStarting}
-            isActive={camera.isActive}
-            lastError={camera.lastError}
-            onStartCamera={camera.startCamera}
-            onStopCamera={camera.stopCamera}
-          />
-
-          <BeforeAfterPreview
-            originalFrameSrc={sessionSnapshot.originalFrameSrc}
-            processedFrameSrc={sessionSnapshot.processedFrameSrc}
-            detections={sessionSnapshot.lastDetectionCounts}
-            latencyMs={sessionSnapshot.lastServerLatencyMs}
-            afterTitle="Character preview"
-            afterDescription="선택한 프리셋 기준으로 백엔드 처리된 캐릭터 프리뷰가 갱신됩니다."
-            afterEmptyLabel="세션을 시작하면 캐릭터 프리뷰가 이 영역에 표시됩니다."
-          />
-        </div>
-
-        <div style={{ display: "grid", gap: "1rem", alignSelf: "start" }}>
-          <CharacterSessionControlCard
-            status={sessionSnapshot.status}
-            sessionId={sessionSnapshot.sessionId}
-            isCameraReady={sessionSnapshot.isCameraReady}
-            hasPreset={Boolean(selectedPreset)}
-            isBusy={realtimeSession.isBusy}
-            isUploading={sessionSnapshot.isUploading}
-            onStartSession={() => {
-              void realtimeSession.startSession();
-            }}
-            onStopSession={() => {
-              void realtimeSession.stopSession();
-            }}
-          />
-
-          <DetectionSummaryCard
-            detections={sessionSnapshot.lastDetectionCounts}
-            latencyMs={sessionSnapshot.lastServerLatencyMs}
-            lastRequestId={sessionSnapshot.lastRequestId}
-            lastError={sessionSnapshot.lastError ?? diagnosticsSnapshot.lastError}
-          />
-
-          <PanelCard kicker="DiagnosticsPanel" title="Runtime snapshot" description="현재 백엔드 런타임 상태를 캐릭터 모드 기준으로 표시합니다.">
-            <div style={{ display: "grid", gap: "0.75rem" }}>
-              {diagnosticsItems.map((item) => (
-                <div key={item.label} style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", alignItems: "center" }}>
-                  <span style={{ color: "#4b5563", fontSize: "0.9rem" }}>{item.label}</span>
-                  <StatusBadge label={item.value} tone={item.tone} />
-                </div>
-              ))}
+            <div className="selection-list">
+              {presets.map((preset) => {
+                const active = selectedPresetId === preset.presetId;
+                return (
+                  <button
+                    key={preset.presetId}
+                    type="button"
+                    onClick={() => setSelectedPresetId(preset.presetId)}
+                    className={["selection-card", active ? "selection-card--active" : null].filter(Boolean).join(" ")}
+                  >
+                    <strong>{preset.label}</strong>
+                    <span className="selection-card__meta">preset_id: {preset.presetId}</span>
+                  </button>
+                );
+              })}
             </div>
-          </PanelCard>
-        </div>
-      </section>
-    </div>
+          </div>
+        </PanelCard>
+      </div>
+
+      <div className="stack-md">
+        <CameraViewport
+          videoRef={camera.videoRef}
+          permission={camera.permission}
+          isStarting={camera.isStarting}
+          isActive={camera.isActive}
+          lastError={camera.lastError}
+          onStartCamera={camera.startCamera}
+          onStopCamera={camera.stopCamera}
+        />
+
+        <BeforeAfterPreview
+          originalFrameSrc={sessionSnapshot.originalFrameSrc}
+          processedFrameSrc={sessionSnapshot.processedFrameSrc}
+          detections={sessionSnapshot.lastDetectionCounts}
+          latencyMs={sessionSnapshot.lastServerLatencyMs}
+          afterTitle="Character preview"
+          afterDescription="선택한 프리셋 기준으로 백엔드 처리된 캐릭터 프리뷰가 매끄럽게 갱신됩니다."
+          afterEmptyLabel="세션을 시작하면 캐릭터 프리뷰가 이 영역에 표시됩니다."
+        />
+      </div>
+
+      <div className="stack-md">
+        <CharacterSessionControlCard
+          status={sessionSnapshot.status}
+          sessionId={sessionSnapshot.sessionId}
+          isCameraReady={sessionSnapshot.isCameraReady}
+          hasPreset={Boolean(selectedPreset)}
+          isBusy={realtimeSession.isBusy}
+          isUploading={sessionSnapshot.isUploading}
+          onStartSession={() => {
+            void realtimeSession.startSession();
+          }}
+          onStopSession={() => {
+            void realtimeSession.stopSession();
+          }}
+        />
+
+        <DetectionSummaryCard
+          detections={sessionSnapshot.lastDetectionCounts}
+          latencyMs={sessionSnapshot.lastServerLatencyMs}
+          lastRequestId={sessionSnapshot.lastRequestId}
+          lastError={sessionSnapshot.lastError ?? diagnosticsSnapshot.lastError}
+        />
+      </div>
+    </section>
   );
 }
