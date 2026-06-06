@@ -82,20 +82,6 @@ export function AppShell({
             <h1>{title}</h1>
             <p className="hero-card__description">{description}</p>
 
-            <nav className="nav-pills" aria-label="섹션 이동">
-              {NAV_ITEMS.map((item) => {
-                const isActive = item.routeKey === currentRoute;
-                return (
-                  <Link
-                    key={item.routeKey}
-                    href={item.href}
-                    className={["nav-pill", isActive ? "nav-pill--active" : null].filter(Boolean).join(" ")}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
           </div>
 
           <div className="hero-card__meta">

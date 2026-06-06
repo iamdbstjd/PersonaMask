@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import HTTPException, UploadFile, status
 
+from app.core.config import Settings
 from app.pipelines.frame_processor import (
     apply_character_effects,
     apply_privacy_effects,
@@ -26,6 +27,27 @@ from app.schemas.realtime import (
 
 
 class RealtimeService:
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+        session_repository.configure_storage(settings.data_dir)
+
+    async def _read_limited_frame(self, frame: UploadFile) -> bytes:
+        if frame.content_type and not frame.content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "UNSUPPORTED_MEDIA_TYPE", "message": "frame must be an image media type"},
+            )
+        payload = await frame.read(self.settings.max_realtime_frame_bytes + 1)
+        if len(payload) > self.settings.max_realtime_frame_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail={
+                    "code": "FRAME_TOO_LARGE",
+                    "message": f"frame upload must be <= {self.settings.max_realtime_frame_bytes} bytes",
+                },
+            )
+        return payload
+
     def create_session(self, payload: RealtimeSessionCreateRequest) -> RealtimeSessionData:
         if payload.mode == "character" and not payload.preset_id:
             raise HTTPException(
@@ -74,7 +96,7 @@ class RealtimeService:
 
         started = perf_counter()
         meta = self._load_meta(raw_meta, session.mode)
-        frame_bytes = await frame.read()
+        frame_bytes = await self._read_limited_frame(frame)
         try:
             decoded = decode_image_bytes(frame_bytes)
         except ValueError as exc:

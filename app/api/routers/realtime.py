@@ -5,11 +5,11 @@ import json
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
+from app.core.config import get_settings
 from app.services.realtime_service import RealtimeService
 from app.schemas.realtime import RealtimeSessionCreateRequest
 
 router = APIRouter(tags=["realtime"])
-service = RealtimeService()
 
 
 def _request_id(request: Request, fallback: str) -> str:
@@ -18,12 +18,14 @@ def _request_id(request: Request, fallback: str) -> str:
 
 @router.post("/realtime/sessions")
 def create_realtime_session(payload: RealtimeSessionCreateRequest, request: Request) -> dict[str, object]:
+    service = RealtimeService(get_settings())
     session = service.create_session(payload)
     return {"request_id": _request_id(request, "generated-rt-session-request"), "data": session.model_dump(), "error": None}
 
 
 @router.delete("/realtime/sessions/{session_id}")
 def delete_realtime_session(session_id: str, request: Request) -> dict[str, object]:
+    service = RealtimeService(get_settings())
     deleted = service.delete_session(session_id)
     return {
         "request_id": _request_id(request, "generated-rt-session-delete-request"),
@@ -39,6 +41,7 @@ async def process_realtime_frame(
     frame: UploadFile = File(...),
     meta: str | None = Form(default=None),
 ):
+    service = RealtimeService(get_settings())
     result = await service.process_frame(session_id=session_id, frame=frame, raw_meta=meta)
     request_id = _request_id(request, f"req_frame_{result['frame_meta'].frame_id}")
 

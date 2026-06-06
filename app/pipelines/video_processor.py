@@ -5,11 +5,13 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any
+from typing import Sequence
 
 import cv2
 import numpy as np
 
 from app.pipelines.frame_processor import apply_video_review_effects
+from app.pipelines.frame_processor import CandidateReference
 from app.pipelines.frame_processor import FaceBox
 
 
@@ -27,6 +29,7 @@ class VideoProcessingSummary:
     detection_totals: dict[str, int]
     average_blur_reduction_pct: float | None
     suspect_frames: list[dict[str, Any]]
+    candidate_enforcement: dict[str, dict[str, Any]]
 
 
 def _open_capture(path: Path) -> cv2.VideoCapture:
@@ -61,8 +64,15 @@ def process_video_privacy(
     character_id: str | None = None,
     analysis_id: str | None = None,
     candidate_actions: dict[str, str] | None = None,
+    candidate_references: Sequence[CandidateReference] | None = None,
 ) -> VideoProcessingSummary:
     capture = _open_capture(upload_path)
+    candidate_references = tuple(candidate_references or ())
+    candidate_matcher = (
+        "insightface_arcface_cosine"
+        if any(reference.embedding is not None for reference in candidate_references)
+        else "opencv_hsv_histogram_baseline"
+    )
 
     fps = float(capture.get(cv2.CAP_PROP_FPS) or 24.0)
     width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
@@ -92,6 +102,7 @@ def process_video_privacy(
         "plates_redacted": 0,
         "text_regions_redacted": 0,
     }
+    candidate_match_totals: dict[str, int] = {candidate_id: 0 for candidate_id in (candidate_actions or {})}
 
     try:
         while True:
@@ -108,6 +119,7 @@ def process_video_privacy(
                 blur_text=blur_text,
                 allowlist_enabled=allowlist_enabled,
                 character_id=character_id,
+                candidate_references=candidate_references,
             )
             writer.write(result.image_bgr)
             frame_index = processed_frames
@@ -116,6 +128,8 @@ def process_video_privacy(
             detection_totals["faces_redacted"] += result.detections.faces_redacted
             detection_totals["plates_redacted"] += result.detections.plates_redacted
             detection_totals["text_regions_redacted"] += result.detections.text_regions_redacted
+            for candidate_id, count in result.candidate_matches.items():
+                candidate_match_totals[candidate_id] = candidate_match_totals.get(candidate_id, 0) + count
 
             blur_reduction = _blur_reduction_pct(source_frame, result.image_bgr, result.redacted_regions)
             if blur_reduction is not None:
@@ -164,6 +178,14 @@ def process_video_privacy(
         "character_id": character_id,
         "analysis_id": analysis_id,
         "candidate_actions": candidate_actions or {},
+        "candidate_enforcement": {
+            candidate_id: {
+                "action": action,
+                "matched_frames": candidate_match_totals.get(candidate_id, 0),
+                "matcher": candidate_matcher,
+            }
+            for candidate_id, action in (candidate_actions or {}).items()
+        },
         "processed_frames": processed_frames,
         "detection_totals": detection_totals,
         "average_blur_reduction_pct": average_blur_reduction_pct,
@@ -187,6 +209,7 @@ def process_video_privacy(
         detection_totals=detection_totals,
         average_blur_reduction_pct=average_blur_reduction_pct,
         suspect_frames=suspect_frames[:50],
+        candidate_enforcement=report_payload["candidate_enforcement"],
     )
 
 
@@ -269,6 +292,7 @@ def _labeled_tile(frame: np.ndarray, label: str, width: int = 220) -> np.ndarray
 def _markdown_report(payload: dict[str, Any]) -> str:
     totals = payload["detection_totals"]
     suspects = payload["suspect_frames"]
+    candidate_enforcement = payload.get("candidate_enforcement", {})
     lines = [
         "# Redaction QA Report",
         "",
@@ -284,9 +308,21 @@ def _markdown_report(payload: dict[str, Any]) -> str:
         f"- Average blur reduction pct: {payload['average_blur_reduction_pct']}",
         f"- Suspect frame count: {len(suspects)}",
         "",
-        "## Suspect Frames",
+        "## Candidate Enforcement",
         "",
     ]
+    if not candidate_enforcement:
+        lines.append("No candidate-specific actions were provided.")
+    else:
+        for candidate_id, detail in candidate_enforcement.items():
+            lines.append(f"- {candidate_id}: {detail['action']} ({detail['matched_frames']} matched frames)")
+    lines.extend(
+        [
+            "",
+            "## Suspect Frames",
+            "",
+        ]
+    )
     if not suspects:
         lines.append("No suspect frames were flagged by the baseline QA heuristics.")
     else:

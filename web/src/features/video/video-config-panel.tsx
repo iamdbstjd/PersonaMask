@@ -46,28 +46,24 @@ export function VideoConfigPanel({
       <div className="stack-sm">
         <ToggleCard
           label="얼굴 블러"
-          description="처리되는 모든 프레임에서 검출된 얼굴을 기본 리댁션 대상으로 둡니다."
           checked={config.privacy_options.blur_faces}
           disabled={disabled}
           onChange={(checked) => onPrivacyOptionChange("blur_faces", checked)}
         />
         <ToggleCard
           label="번호판 블러"
-          description="프라이버시 모드 계약에 맞춰 번호판 보호를 유지합니다."
           checked={config.privacy_options.blur_plates}
           disabled={disabled}
           onChange={(checked) => onPrivacyOptionChange("blur_plates", checked)}
         />
         <ToggleCard
           label="텍스트 블러"
-          description="배치 처리 중 보이는 텍스트 오버레이와 표지판을 리댁션합니다."
           checked={config.privacy_options.blur_text}
           disabled={disabled}
           onChange={(checked) => onPrivacyOptionChange("blur_text", checked)}
         />
         <ToggleCard
           label="허용 목록 반영"
-          description="백엔드 정책이 지원하는 경우 허용된 인물 예외 규칙을 반영합니다."
           checked={config.privacy_options.allowlist_enabled}
           disabled={disabled}
           onChange={(checked) => onPrivacyOptionChange("allowlist_enabled", checked)}
@@ -87,14 +83,13 @@ export function VideoConfigPanel({
 
       <ToggleCard
         label="오디오 통과"
-        description="현재 OpenCV 렌더러는 영상 전용 MP4를 출력하며, 오디오 통과는 FFmpeg 처리 경로에서 지원할 예정입니다."
         checked={false}
         disabled
         onChange={onKeepAudioChange}
       />
 
       <Button onClick={onResetDefaults} disabled={disabled} variant="ghost" size="sm">
-        기본값으로 되돌리기 ({DEFAULT_VIDEO_JOB_CONFIG.output_options.container}/{DEFAULT_VIDEO_JOB_CONFIG.output_options.video_codec})
+        기본값 복원 ({DEFAULT_VIDEO_JOB_CONFIG.output_options.container}/{DEFAULT_VIDEO_JOB_CONFIG.output_options.video_codec})
       </Button>
     </section>
   );

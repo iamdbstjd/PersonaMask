@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 
 import { Button } from "../../components/common/button";
@@ -40,6 +41,42 @@ function getActionTone(action: CandidateAction): "neutral" | "success" | "warnin
     return "warning";
   }
   return "neutral";
+}
+
+function CandidateImage({ alt, src, accessToken }: { alt: string; src: string; accessToken: string }) {
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    let currentObjectUrl: string | null = null;
+
+    async function loadImage() {
+      const response = await fetch(src, { headers: { "X-Access-Token": accessToken } });
+      if (!response.ok) {
+        return;
+      }
+      currentObjectUrl = URL.createObjectURL(await response.blob());
+      if (active) {
+        setObjectUrl(currentObjectUrl);
+      } else {
+        URL.revokeObjectURL(currentObjectUrl);
+      }
+    }
+
+    void loadImage();
+    return () => {
+      active = false;
+      if (currentObjectUrl) {
+        URL.revokeObjectURL(currentObjectUrl);
+      }
+    };
+  }, [accessToken, src]);
+
+  if (!objectUrl) {
+    return <div className="candidate-card__image-placeholder" aria-label={alt} />;
+  }
+
+  return <Image src={objectUrl} alt={alt} width={180} height={180} unoptimized />;
 }
 
 export function CandidateReviewBoard({
@@ -85,7 +122,7 @@ export function CandidateReviewBoard({
             return (
               <article key={candidate.candidate_id} className={`candidate-card candidate-card--${selectedAction}`}>
                 <div className="candidate-card__media">
-                  <Image src={candidate.image_url} alt={`후보 ${index + 1}`} width={180} height={180} unoptimized />
+                  <CandidateImage accessToken={analysis.access_token} src={candidate.image_url} alt={`후보 ${index + 1}`} />
                   <div className="candidate-card__index">{String(index + 1).padStart(2, "0")}</div>
                 </div>
 

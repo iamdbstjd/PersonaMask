@@ -34,7 +34,13 @@ class DiagnosticsService:
 
     def diagnostics_payload(self) -> dict[str, Any]:
         runtime = probe_runtime()
-        gpu_status = "ready" if runtime.get("cuda_enabled") else "cpu_only"
+        nvidia = runtime.get("nvidia", {})
+        if runtime.get("cuda_enabled") and nvidia.get("available"):
+            gpu_status = "ready"
+        elif runtime.get("cuda_enabled"):
+            gpu_status = "provider_ready_driver_unavailable"
+        else:
+            gpu_status = "cpu_only"
         api_status = "healthy"
         runtime_status = "ready"
         queue_depth = job_repository.get_queue_depth()

@@ -6,7 +6,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from app.pipelines.frame_processor import FaceBox, detect_faces
+from app.pipelines.frame_processor import FaceBox, detect_face_details
 
 
 @dataclass(frozen=True)
@@ -16,6 +16,19 @@ class VideoFaceCandidate:
     frame_index: int
     bbox: FaceBox
     confidence: float = 1.0
+    embedding: tuple[float, ...] | None = None
+    detector: str = "opencv_haar"
+    cluster_size: int = 1
+
+
+@dataclass(frozen=True)
+class _CandidateObservation:
+    frame_index: int
+    bbox: FaceBox
+    crop: np.ndarray
+    confidence: float
+    embedding: tuple[float, ...] | None
+    detector: str
 
 
 def extract_video_face_candidates(
@@ -31,8 +44,7 @@ def extract_video_face_candidates(
         capture.release()
         raise ValueError(f"unable to open video for candidate analysis: {video_path.name}")
 
-    candidates: list[VideoFaceCandidate] = []
-    seen_histograms: list[np.ndarray] = []
+    observations: list[_CandidateObservation] = []
     try:
         total_frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
         for frame_index in _sample_positions(total_frames, max_frames):
@@ -42,32 +54,26 @@ def extract_video_face_candidates(
             if not ok:
                 break
 
-            for face in detect_faces(frame):
-                crop = _crop_face(frame, face)
+            for detection in detect_face_details(frame):
+                crop = _crop_face(frame, detection.box)
                 if _is_low_quality_crop(crop):
                     continue
-                histogram = _crop_histogram(crop)
-                if _is_duplicate(histogram, seen_histograms):
-                    continue
-
-                candidate_id = f"face_{len(candidates) + 1:04d}"
-                image_path = output_dir / f"{candidate_id}.jpg"
-                cv2.imwrite(str(image_path), crop)
-                candidates.append(
-                    VideoFaceCandidate(
-                        candidate_id=candidate_id,
-                        image_path=image_path,
+                observations.append(
+                    _CandidateObservation(
                         frame_index=frame_index,
-                        bbox=face,
+                        bbox=detection.box,
+                        crop=crop,
+                        confidence=detection.confidence,
+                        embedding=detection.embedding,
+                        detector=detection.detector,
                     )
                 )
-                seen_histograms.append(histogram)
-                if len(candidates) >= max_candidates:
-                    return candidates
     finally:
         capture.release()
 
-    return candidates
+    if any(observation.embedding is not None for observation in observations):
+        return _write_embedding_clusters(observations, output_dir, max_candidates=max_candidates)
+    return _write_histogram_candidates(observations, output_dir, max_candidates=max_candidates)
 
 
 def _sample_positions(total_frames: int, max_frames: int) -> list[int]:
@@ -102,6 +108,121 @@ def _is_low_quality_crop(crop: np.ndarray) -> bool:
         return True
     aspect_ratio = width / max(1, height)
     return aspect_ratio < 0.55 or aspect_ratio > 1.8
+
+
+def _embedding_similarity(left: tuple[float, ...], right: tuple[float, ...]) -> float:
+    return float(np.dot(np.asarray(left, dtype=np.float32), np.asarray(right, dtype=np.float32)))
+
+
+def _centroid(items: list[_CandidateObservation]) -> tuple[float, ...]:
+    embeddings = [np.asarray(item.embedding, dtype=np.float32) for item in items if item.embedding is not None]
+    if not embeddings:
+        return ()
+    centroid = np.mean(embeddings, axis=0)
+    norm = float(np.linalg.norm(centroid))
+    if norm <= 1e-12:
+        return tuple(centroid.astype(float).tolist())
+    return tuple((centroid / norm).astype(float).tolist())
+
+
+def _representative_observation(items: list[_CandidateObservation]) -> _CandidateObservation:
+    return max(items, key=lambda item: (item.confidence, item.bbox.area))
+
+
+def _write_embedding_clusters(
+    observations: list[_CandidateObservation],
+    output_dir: Path,
+    *,
+    max_candidates: int,
+    threshold: float = 0.35,
+) -> list[VideoFaceCandidate]:
+    clusters: list[dict[str, object]] = []
+    for observation in observations:
+        if observation.embedding is None:
+            continue
+        best_cluster: dict[str, object] | None = None
+        best_score = -1.0
+        for cluster in clusters:
+            centroid = cluster["centroid"]
+            if not isinstance(centroid, tuple):
+                continue
+            score = _embedding_similarity(observation.embedding, centroid)
+            if score > best_score:
+                best_score = score
+                best_cluster = cluster
+        if best_cluster is not None and best_score >= threshold:
+            items = best_cluster["items"]
+            if isinstance(items, list):
+                items.append(observation)
+                best_cluster["centroid"] = _centroid(items)
+        else:
+            clusters.append({"items": [observation], "centroid": observation.embedding})
+
+    stable_clusters = [cluster for cluster in clusters if isinstance(cluster["items"], list) and len(cluster["items"]) >= 2]
+    if stable_clusters:
+        clusters = stable_clusters
+    clusters.sort(
+        key=lambda cluster: (
+            len(cluster["items"]) if isinstance(cluster["items"], list) else 0,
+            _representative_observation(cluster["items"]).confidence if isinstance(cluster["items"], list) else 0.0,
+        ),
+        reverse=True,
+    )
+
+    candidates: list[VideoFaceCandidate] = []
+    for cluster in clusters[:max_candidates]:
+        items = cluster["items"]
+        if not isinstance(items, list) or not items:
+            continue
+        representative = _representative_observation(items)
+        candidate_id = f"face_{len(candidates) + 1:04d}"
+        image_path = output_dir / f"{candidate_id}.jpg"
+        cv2.imwrite(str(image_path), representative.crop)
+        candidates.append(
+            VideoFaceCandidate(
+                candidate_id=candidate_id,
+                image_path=image_path,
+                frame_index=representative.frame_index,
+                bbox=representative.bbox,
+                confidence=round(float(np.mean([item.confidence for item in items])), 4),
+                embedding=_centroid(items),
+                detector=representative.detector,
+                cluster_size=len(items),
+            )
+        )
+    return candidates
+
+
+def _write_histogram_candidates(
+    observations: list[_CandidateObservation],
+    output_dir: Path,
+    *,
+    max_candidates: int,
+) -> list[VideoFaceCandidate]:
+    candidates: list[VideoFaceCandidate] = []
+    seen_histograms: list[np.ndarray] = []
+    for observation in observations:
+        histogram = _crop_histogram(observation.crop)
+        if _is_duplicate(histogram, seen_histograms):
+            continue
+
+        candidate_id = f"face_{len(candidates) + 1:04d}"
+        image_path = output_dir / f"{candidate_id}.jpg"
+        cv2.imwrite(str(image_path), observation.crop)
+        candidates.append(
+            VideoFaceCandidate(
+                candidate_id=candidate_id,
+                image_path=image_path,
+                frame_index=observation.frame_index,
+                bbox=observation.bbox,
+                confidence=observation.confidence,
+                detector=observation.detector,
+            )
+        )
+        seen_histograms.append(histogram)
+        if len(candidates) >= max_candidates:
+            break
+    return candidates
 
 
 def _crop_histogram(crop: np.ndarray) -> np.ndarray:

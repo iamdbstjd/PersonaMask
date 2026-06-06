@@ -12,6 +12,8 @@ class Settings:
     api_prefix: str = os.getenv("API_PREFIX", "/api/v1")
     models_dir: str = os.getenv("MODELS_DIR", "./models")
     data_dir: str = os.getenv("DATA_DIR", "./data")
+    max_realtime_frame_bytes: int = int(os.getenv("MAX_REALTIME_FRAME_BYTES", str(8 * 1024 * 1024)))
+    max_allowlist_image_bytes: int = int(os.getenv("MAX_ALLOWLIST_IMAGE_BYTES", str(10 * 1024 * 1024)))
     use_gpu: bool = os.getenv("USE_GPU", "1") not in {"0", "false", "False"}
     execution_providers: tuple[str, ...] = tuple(
         item.strip()

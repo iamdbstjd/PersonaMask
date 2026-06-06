@@ -1,1 +1,1 @@
-"""Character Mask & Privacy backend package."""
+"""PersonaMask Video Review backend package."""

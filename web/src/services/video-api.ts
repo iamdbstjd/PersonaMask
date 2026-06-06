@@ -25,7 +25,7 @@ export type PrivacyOptions = {
 
 export type OutputOptions = {
   container: "mp4";
-  video_codec: "h264";
+  video_codec: "mp4v";
   keep_audio: boolean;
 };
 
@@ -33,6 +33,7 @@ export type VideoJobConfig = {
   mode: VideoJobProcessingMode;
   character_id?: string | null;
   analysis_id?: string | null;
+  candidate_access_token?: string | null;
   candidate_actions?: Record<string, CandidateAction>;
   privacy_options: PrivacyOptions;
   output_options: OutputOptions;
@@ -63,6 +64,7 @@ export type VideoJobResult = {
 export type VideoJobCreateData = {
   job_id: string;
   status: "queued";
+  access_token: string;
   status_endpoint: string;
   cancel_endpoint: string;
 };
@@ -107,6 +109,7 @@ export type VideoFaceCandidate = {
 
 export type VideoCandidateAnalysisData = {
   analysis_id: string;
+  access_token: string;
   source_filename: string;
   candidates: VideoFaceCandidate[];
 };
@@ -123,6 +126,7 @@ export const DEFAULT_VIDEO_JOB_CONFIG: VideoJobConfig = {
   mode: "blur",
   character_id: "spider",
   analysis_id: null,
+  candidate_access_token: null,
   candidate_actions: {},
   privacy_options: {
     blur_faces: true,
@@ -132,7 +136,7 @@ export const DEFAULT_VIDEO_JOB_CONFIG: VideoJobConfig = {
   },
   output_options: {
     container: "mp4",
-    video_codec: "h264",
+    video_codec: "mp4v",
     keep_audio: false,
   },
 };
@@ -203,11 +207,15 @@ export function getVideoJobStatusUrl(jobId: string): string {
 }
 
 export function getVideoJobCancelUrl(jobId: string): string {
-  return `${getVideoJobStatusUrl(jobId)}/cancel`;
+  return `${VIDEO_JOB_BASE_PATH}/${encodeURIComponent(jobId)}/cancel`;
 }
 
 export function getVideoJobResultUrl(jobId: string): string {
-  return `${getVideoJobStatusUrl(jobId)}/result`;
+  return `${VIDEO_JOB_BASE_PATH}/${encodeURIComponent(jobId)}/result`;
+}
+
+function accessHeaders(accessToken: string): HeadersInit {
+  return { "X-Access-Token": accessToken };
 }
 
 export async function analyzeVideoCandidates(file: File, fetchImpl: FetchLike = fetch): Promise<VideoCandidateAnalysisData> {
@@ -242,20 +250,24 @@ export async function createVideoJob(
   return response.data;
 }
 
-export async function getVideoJobStatus(jobId: string, fetchImpl: FetchLike = fetch): Promise<VideoJobStatusData> {
+export async function getVideoJobStatus(
+  jobId: string,
+  accessToken: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<VideoJobStatusData> {
   const response = await requestJson<VideoJobStatusResponse>(
     getVideoJobStatusUrl(jobId),
-    { method: "GET" },
+    { method: "GET", headers: accessHeaders(accessToken) },
     fetchImpl,
   );
 
   return response.data;
 }
 
-export async function cancelVideoJob(jobId: string, fetchImpl: FetchLike = fetch): Promise<VideoJobCancelData> {
+export async function cancelVideoJob(jobId: string, accessToken: string, fetchImpl: FetchLike = fetch): Promise<VideoJobCancelData> {
   const response = await requestJson<VideoJobCancelResponse>(
     getVideoJobCancelUrl(jobId),
-    { method: "POST" },
+    { method: "POST", headers: accessHeaders(accessToken) },
     fetchImpl,
   );
 

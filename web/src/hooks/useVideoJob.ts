@@ -26,6 +26,7 @@ import {
 
 export type VideoJobSnapshot = {
   jobId: string;
+  accessToken: string;
   status: VideoJobServerStatus;
   progress: VideoJobProgress;
   result: VideoJobResult | null;
@@ -69,6 +70,7 @@ export type UseVideoJobResult = {
 function createQueuedSnapshot(data: VideoJobCreateData): VideoJobSnapshot {
   return {
     jobId: data.job_id,
+    accessToken: data.access_token,
     status: data.status,
     progress: createEmptyProgress(),
     result: null,
@@ -124,11 +126,12 @@ export function useVideoJob({
     }
 
     try {
-      const next = await getVideoJobStatus(job.jobId, fetchImpl);
+      const next = await getVideoJobStatus(job.jobId, job.accessToken, fetchImpl);
       setJob((previous) => {
         if (!previous || previous.jobId !== next.job_id) {
           return {
             jobId: next.job_id,
+            accessToken: previous?.accessToken ?? job.accessToken,
             status: next.status,
             progress: next.progress,
             result: next.result,
@@ -149,7 +152,7 @@ export function useVideoJob({
     } catch (error) {
       setLastError(toErrorMessage(error));
     }
-  }, [fetchImpl, job?.jobId]);
+  }, [fetchImpl, job?.accessToken, job?.jobId]);
 
   useEffect(() => {
     if (!job?.jobId || (status !== "queued" && status !== "processing")) {
@@ -176,6 +179,7 @@ export function useVideoJob({
       setConfig((previous) => ({
         ...previous,
         analysis_id: null,
+        candidate_access_token: null,
         candidate_actions: {},
       }));
     }
@@ -199,6 +203,7 @@ export function useVideoJob({
       setConfig((previous) => ({
         ...previous,
         analysis_id: analysis.analysis_id,
+        candidate_access_token: analysis.access_token,
         candidate_actions: defaultActions,
         mode: deriveModeFromActions(defaultActions, previous.mode),
         privacy_options: {
@@ -266,6 +271,7 @@ export function useVideoJob({
     setConfig({
       ...initialConfig,
       analysis_id: candidateAnalysis?.analysis_id ?? null,
+      candidate_access_token: candidateAnalysis?.access_token ?? null,
       candidate_actions: candidateActions,
       mode: deriveModeFromActions(candidateActions, initialConfig.mode),
       privacy_options: {
@@ -275,7 +281,7 @@ export function useVideoJob({
         ),
       },
     });
-  }, [candidateActions, candidateAnalysis?.analysis_id, initialConfig]);
+  }, [candidateActions, candidateAnalysis?.access_token, candidateAnalysis?.analysis_id, initialConfig]);
 
   const submit = useCallback(async () => {
     if (!selectedFile) {
@@ -303,7 +309,7 @@ export function useVideoJob({
     }
 
     try {
-      await cancelVideoJob(job.jobId, fetchImpl);
+      await cancelVideoJob(job.jobId, job.accessToken, fetchImpl);
       setJob((previous) =>
         previous
           ? {
@@ -336,8 +342,8 @@ export function useVideoJob({
   }, [isAnalyzingCandidates, selectedFile, status]);
 
   const canSubmit = useMemo(() => {
-    return Boolean(selectedFile) && status !== "uploading" && status !== "processing" && status !== "queued";
-  }, [selectedFile, status]);
+    return Boolean(selectedFile) && candidateAnalysis !== null && status !== "uploading" && status !== "processing" && status !== "queued";
+  }, [candidateAnalysis, selectedFile, status]);
 
   const canCancel = useMemo(() => {
     return Boolean(job?.jobId) && (status === "queued" || status === "processing");

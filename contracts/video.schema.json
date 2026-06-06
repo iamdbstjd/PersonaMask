@@ -75,7 +75,7 @@
         "video_codec": {
           "type": "string",
           "enum": [
-            "h264"
+            "mp4v"
           ]
         },
         "keep_audio": {
@@ -113,6 +113,12 @@
             "null"
           ]
         },
+        "candidate_access_token": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "candidate_actions": {
           "type": "object",
           "additionalProperties": {
@@ -139,6 +145,7 @@
       "required": [
         "job_id",
         "status",
+        "access_token",
         "status_endpoint",
         "cancel_endpoint"
       ],
@@ -151,6 +158,9 @@
           "enum": [
             "queued"
           ]
+        },
+        "access_token": {
+          "type": "string"
         },
         "status_endpoint": {
           "type": "string"
@@ -218,11 +228,15 @@
       "additionalProperties": false,
       "required": [
         "analysis_id",
+        "access_token",
         "source_filename",
         "candidates"
       ],
       "properties": {
         "analysis_id": {
+          "type": "string"
+        },
+        "access_token": {
           "type": "string"
         },
         "source_filename": {

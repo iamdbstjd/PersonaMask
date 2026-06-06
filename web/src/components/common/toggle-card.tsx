@@ -4,7 +4,7 @@ import type { InputHTMLAttributes } from "react";
 
 type ToggleCardProps = {
   label: string;
-  description: string;
+  description?: string;
   checked: boolean;
   disabled?: boolean;
   onChange: (checked: boolean) => void;
@@ -45,7 +45,7 @@ export function ToggleCard({
       />
       <span>
         <span className="toggle-card__label">{label}</span>
-        <span className="toggle-card__description">{description}</span>
+        {description ? <span className="toggle-card__description">{description}</span> : null}
       </span>
       <span className={["toggle-switch", checked ? "toggle-switch--checked" : null].filter(Boolean).join(" ")} aria-hidden="true">
         <span className="toggle-switch__thumb" />

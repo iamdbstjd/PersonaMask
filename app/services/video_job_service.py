@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+import json
 from json import JSONDecodeError, loads
 from pathlib import Path
 import re
+import secrets
 import shutil
+import threading
 from typing import BinaryIO
 from uuid import uuid4
 
+import cv2
 from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
+from pydantic import ValidationError
 
 from app.core.config import Settings
+from app.pipelines.frame_processor import CandidateReference
 from app.pipelines.video_processor import VideoProcessingError, probe_video, process_video_privacy
 from app.repositories.job_repository import JobRecord, job_repository
 from app.schemas.videos import (
@@ -22,13 +28,15 @@ from app.schemas.videos import (
     VideoJobProgress,
     VideoJobResult,
 )
-from app.services.video_candidate_service import extract_video_face_candidates
+from app.services.video_candidate_service import VideoFaceCandidate, extract_video_face_candidates
 
 
 class VideoJobService:
     SUPPORTED_EXTENSIONS = {".mp4", ".mov", ".webm", ".mkv", ".avi"}
     MAX_UPLOAD_BYTES = 1024 * 1024 * 1024  # 1GB safety cap for local skeleton runtime
     SAFE_ID = re.compile(r"^[A-Za-z0-9_-]+$")
+    _processing_lock = threading.Lock()
+    _processing_jobs: set[str] = set()
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -38,16 +46,17 @@ class VideoJobService:
         self.upload_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.candidate_dir.mkdir(parents=True, exist_ok=True)
+        job_repository.configure_storage(settings.data_dir)
 
     def _parse_config(self, raw_config: str | None) -> VideoJobCreateRequest:
         if not raw_config:
             return VideoJobCreateRequest()
         try:
             return VideoJobCreateRequest.model_validate(loads(raw_config))
-        except JSONDecodeError as exc:
+        except (JSONDecodeError, ValidationError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"code": "INVALID_CONFIG", "message": "config must be valid JSON.", "details": {"error": str(exc)}},
+                detail={"code": "INVALID_CONFIG", "message": "config must be valid video job JSON.", "details": {"error": str(exc)}},
             ) from exc
 
     def _sanitize_filename(self, filename: str | None, fallback: str) -> str:
@@ -59,6 +68,7 @@ class VideoJobService:
         source: BinaryIO = file.file
         source.seek(0)
         total_bytes = 0
+        target_path.parent.mkdir(parents=True, exist_ok=True)
         with target_path.open("wb") as out:
             while True:
                 chunk = source.read(1024 * 1024)
@@ -68,7 +78,7 @@ class VideoJobService:
                 if total_bytes > self.MAX_UPLOAD_BYTES:
                     target_path.unlink(missing_ok=True)
                     raise HTTPException(
-                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                         detail={
                             "code": "VIDEO_TOO_LARGE",
                             "message": f"video upload must be <= {self.MAX_UPLOAD_BYTES} bytes",
@@ -76,6 +86,21 @@ class VideoJobService:
                     )
                 out.write(chunk)
         return total_bytes
+
+    def _validate_access_token(self, expected: str, provided: str | None) -> None:
+        if not provided or not secrets.compare_digest(expected, provided):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "ACCESS_TOKEN_REQUIRED", "message": "A valid access token is required for this video artifact."},
+            )
+
+    def _output_path(self, record: JobRecord) -> Path:
+        stem = Path(record.filename).stem or "result"
+        return self.output_dir / record.job_id / f"{stem}.mp4"
+
+    def resume_pending_jobs(self) -> None:
+        for record in job_repository.list_by_status({"queued"}):
+            self._schedule_processing(record.job_id)
 
     def _validate_video_upload(self, file: UploadFile, safe_filename: str) -> None:
         suffix = Path(safe_filename).suffix.lower()
@@ -93,6 +118,17 @@ class VideoJobService:
                 detail={"code": "UNSUPPORTED_MEDIA_TYPE", "message": "multipart file must be a video media type"},
             )
 
+    def _validate_candidate_analysis_token(self, analysis_id: str | None, access_token: str | None) -> None:
+        if not analysis_id:
+            return
+        manifest = self._read_candidate_manifest(analysis_id)
+        if manifest is None or not isinstance(manifest.get("access_token"), str):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "CANDIDATE_ANALYSIS_NOT_FOUND", "message": "Candidate analysis was not found."},
+            )
+        self._validate_access_token(str(manifest["access_token"]), access_token)
+
     def _to_job_data(self, record: JobRecord) -> VideoJobData:
         progress = VideoJobProgress.model_validate(record.progress)
         result = None
@@ -102,36 +138,43 @@ class VideoJobService:
 
     async def create_job(self, *, file: UploadFile, raw_config: str | None) -> VideoJobCreateData:
         config = self._parse_config(raw_config)
+        self._validate_candidate_analysis_token(config.analysis_id, config.candidate_access_token)
         safe_filename = self._sanitize_filename(file.filename, "upload.mp4")
         self._validate_video_upload(file, safe_filename)
 
-        upload_path = self.upload_dir / safe_filename
+        job_id = f"job_{uuid4().hex[:8]}"
+        access_token = secrets.token_urlsafe(24)
+        upload_path = self.upload_dir / job_id / safe_filename
         self._copy_upload(file, upload_path)
         try:
             total_frames, _, width, height = probe_video(upload_path)
         except VideoProcessingError as exc:
-            upload_path.unlink(missing_ok=True)
+            shutil.rmtree(upload_path.parent, ignore_errors=True)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={"code": "INVALID_VIDEO_FILE", "message": str(exc)},
             ) from exc
         if width <= 0 or height <= 0:
-            upload_path.unlink(missing_ok=True)
+            shutil.rmtree(upload_path.parent, ignore_errors=True)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={"code": "INVALID_VIDEO_FILE", "message": "unable to infer video dimensions"},
             )
 
         record = job_repository.create(
+            job_id=job_id,
             config=config.model_dump(),
             upload_path=str(upload_path),
             filename=safe_filename,
             content_type=file.content_type,
+            access_token=access_token,
             total_frames=total_frames if total_frames > 0 else 3000,
         )
+        self._schedule_processing(record.job_id)
         return VideoJobCreateData(
             job_id=record.job_id,
             status=record.status,
+            access_token=record.access_token,
             status_endpoint=f"/api/v1/videos/jobs/{record.job_id}",
             cancel_endpoint=f"/api/v1/videos/jobs/{record.job_id}/cancel",
         )
@@ -140,6 +183,7 @@ class VideoJobService:
         safe_filename = self._sanitize_filename(file.filename, "upload.mp4")
         self._validate_video_upload(file, safe_filename)
         analysis_id = f"analysis_{uuid4().hex[:10]}"
+        access_token = secrets.token_urlsafe(24)
         analysis_dir = self.candidate_dir / analysis_id
         faces_dir = analysis_dir / "faces"
         analysis_dir.mkdir(parents=True, exist_ok=True)
@@ -161,42 +205,84 @@ class VideoJobService:
                 detail={"code": "INVALID_VIDEO_FILE", "message": str(exc)},
             ) from exc
 
-        return VideoCandidateAnalysisData(
-            analysis_id=analysis_id,
+        candidate_items = [
+            VideoFaceCandidateData(
+                candidate_id=candidate.candidate_id,
+                image_url=f"/api/v1/videos/candidates/{analysis_id}/{candidate.candidate_id}",
+                frame_index=candidate.frame_index,
+                bbox=candidate.bbox.as_list(),
+                confidence=candidate.confidence,
+            )
+            for candidate in candidates
+        ]
+        self._write_candidate_manifest(
+            analysis_dir=analysis_dir,
+            access_token=access_token,
             source_filename=safe_filename,
-            candidates=[
-                VideoFaceCandidateData(
-                    candidate_id=candidate.candidate_id,
-                    image_url=f"/api/v1/videos/candidates/{analysis_id}/{candidate.candidate_id}",
-                    frame_index=candidate.frame_index,
-                    bbox=candidate.bbox.as_list(),
-                    confidence=candidate.confidence,
-                )
-                for candidate in candidates
-            ],
+            candidates=candidates,
+            candidate_items=candidate_items,
         )
 
-    def get_job(self, job_id: str) -> VideoJobData:
-        record = job_repository.advance(job_id)
+        return VideoCandidateAnalysisData(
+            analysis_id=analysis_id,
+            access_token=access_token,
+            source_filename=safe_filename,
+            candidates=candidate_items,
+        )
+
+    def _write_candidate_manifest(
+        self,
+        *,
+        analysis_dir: Path,
+        access_token: str,
+        source_filename: str,
+        candidates: list[VideoFaceCandidate],
+        candidate_items: list[VideoFaceCandidateData],
+    ) -> None:
+        candidate_records: list[dict[str, object]] = []
+        for candidate, candidate_item in zip(candidates, candidate_items):
+            record = candidate_item.model_dump()
+            if candidate.embedding is not None:
+                record["embedding"] = list(candidate.embedding)
+            record["detector"] = candidate.detector
+            record["cluster_size"] = candidate.cluster_size
+            candidate_records.append(record)
+        payload = {
+            "access_token": access_token,
+            "source_filename": source_filename,
+            "candidates": candidate_records,
+        }
+        (analysis_dir / "analysis.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _read_candidate_manifest(self, analysis_id: str) -> dict[str, object] | None:
+        if not self.SAFE_ID.fullmatch(analysis_id):
+            return None
+        manifest_path = self.candidate_dir / analysis_id / "analysis.json"
+        if not manifest_path.exists():
+            return None
+        try:
+            return loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, JSONDecodeError):
+            return None
+
+    def get_job(self, job_id: str, access_token: str | None) -> VideoJobData:
+        record = job_repository.get(job_id)
         if record is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"code": "JOB_NOT_FOUND", "message": "Video job was not found."},
             )
-        if record.status == "completed":
-            try:
-                self._ensure_result_artifact(record)
-            except VideoProcessingError as exc:
-                updated = job_repository.update_status(
-                    record.job_id,
-                    status="failed",
-                    error={"code": "VIDEO_PROCESSING_FAILED", "message": str(exc)},
-                )
-                if updated is not None:
-                    record = updated
+        self._validate_access_token(record.access_token, access_token)
         return self._to_job_data(record)
 
-    def cancel_job(self, job_id: str) -> VideoJobData:
+    def cancel_job(self, job_id: str, access_token: str | None) -> VideoJobData:
+        current = job_repository.get(job_id)
+        if current is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "JOB_NOT_FOUND", "message": "Video job was not found."},
+            )
+        self._validate_access_token(current.access_token, access_token)
         record = job_repository.cancel(job_id)
         if record is None:
             raise HTTPException(
@@ -205,8 +291,86 @@ class VideoJobService:
             )
         return self._to_job_data(record)
 
-    def _ensure_result_artifact(self, record: JobRecord) -> Path:
-        output_path = self.output_dir / f"{record.job_id}-{record.filename}"
+    def _schedule_processing(self, job_id: str) -> None:
+        with self._processing_lock:
+            if job_id in self._processing_jobs:
+                return
+            self._processing_jobs.add(job_id)
+        thread = threading.Thread(target=self._process_job, args=(job_id,), daemon=True)
+        thread.start()
+
+    def _process_job(self, job_id: str) -> None:
+        try:
+            record = job_repository.try_mark_processing(job_id)
+            if record is None:
+                return
+            try:
+                output_path = self._build_result_artifact(record)
+                current = job_repository.get(job_id)
+                if current is not None and current.status == "cancelled":
+                    return
+                if not output_path.exists():
+                    raise VideoProcessingError("render completed without an output artifact")
+            except VideoProcessingError as exc:
+                current = job_repository.get(job_id)
+                if current is not None and current.status != "cancelled":
+                    job_repository.update_status(
+                        job_id,
+                        status="failed",
+                        error={"code": "VIDEO_PROCESSING_FAILED", "message": str(exc)},
+                    )
+        finally:
+            with self._processing_lock:
+                self._processing_jobs.discard(job_id)
+
+    def _load_candidate_references(self, config: dict[str, object]) -> list[CandidateReference]:
+        analysis_id = config.get("analysis_id")
+        candidate_access_token = config.get("candidate_access_token")
+        candidate_actions = config.get("candidate_actions", {})
+        if not isinstance(analysis_id, str) or not self.SAFE_ID.fullmatch(analysis_id):
+            return []
+        if not isinstance(candidate_actions, dict):
+            return []
+        if not isinstance(candidate_access_token, str):
+            raise VideoProcessingError("candidate analysis access token is required for candidate rendering")
+        manifest = self._read_candidate_manifest(analysis_id)
+        if manifest is None or not isinstance(manifest.get("access_token"), str):
+            raise VideoProcessingError("candidate analysis manifest was not found")
+        if not secrets.compare_digest(str(manifest["access_token"]), candidate_access_token):
+            raise VideoProcessingError("candidate analysis access token is invalid")
+
+        faces_dir = (self.candidate_dir / analysis_id / "faces").resolve()
+        candidate_records = {
+            str(item.get("candidate_id")): item
+            for item in manifest.get("candidates", [])
+            if isinstance(item, dict) and isinstance(item.get("candidate_id"), str)
+        }
+        references: list[CandidateReference] = []
+        for candidate_id, action in candidate_actions.items():
+            if not isinstance(candidate_id, str) or not self.SAFE_ID.fullmatch(candidate_id):
+                continue
+            if action not in {"preserve", "character", "blur", "track"}:
+                continue
+            candidate_path = (faces_dir / f"{candidate_id}.jpg").resolve()
+            if not candidate_path.is_relative_to(faces_dir) or not candidate_path.exists():
+                continue
+            image_bgr = cv2.imread(str(candidate_path))
+            if image_bgr is None:
+                continue
+            embedding = None
+            candidate_record = candidate_records.get(candidate_id)
+            if candidate_record is not None:
+                raw_embedding = candidate_record.get("embedding")
+                if isinstance(raw_embedding, list):
+                    try:
+                        embedding = tuple(float(value) for value in raw_embedding)
+                    except (TypeError, ValueError):
+                        embedding = None
+            references.append(CandidateReference(candidate_id=candidate_id, action=str(action), image_bgr=image_bgr, embedding=embedding))
+        return references
+
+    def _build_result_artifact(self, record: JobRecord) -> Path:
+        output_path = self._output_path(record)
         expected_artifacts = [
             output_path.with_name(f"{output_path.stem}-thumb.jpg"),
             output_path.with_name(f"{output_path.stem}-contact-sheet.jpg"),
@@ -216,77 +380,88 @@ class VideoJobService:
         has_current_result = isinstance(record.result, dict) and "qa_summary" in record.result
         needs_processing = not output_path.exists() or not has_current_result or any(not path.exists() for path in expected_artifacts)
 
-        if needs_processing:
-            config = record.config
-            privacy = config.get("privacy_options", {}) if isinstance(config, dict) else {}
-            summary = process_video_privacy(
-                upload_path=Path(record.upload_path),
-                output_path=output_path,
-                mode=str(config.get("mode", "video_privacy")) if isinstance(config, dict) else "video_privacy",
-                blur_faces=bool(privacy.get("blur_faces", True)),
-                blur_plates=bool(privacy.get("blur_plates", True)),
-                blur_text=bool(privacy.get("blur_text", True)),
-                allowlist_enabled=bool(privacy.get("allowlist_enabled", False)),
-                character_id=str(config.get("character_id")) if isinstance(config, dict) and config.get("character_id") else None,
-                analysis_id=str(config.get("analysis_id")) if isinstance(config, dict) and config.get("analysis_id") else None,
-                candidate_actions=config.get("candidate_actions", {}) if isinstance(config, dict) else {},
-            )
-            expires_at = record.result.get("expires_at") if isinstance(record.result, dict) else None
-            result_payload = {
-                "download_url": f"/api/v1/videos/jobs/{record.job_id}/result",
-                "preview_thumbnail_url": f"/api/v1/videos/jobs/{record.job_id}/thumbnail" if summary.preview_thumbnail else None,
-                "contact_sheet_url": f"/api/v1/videos/jobs/{record.job_id}/contact-sheet" if summary.contact_sheet else None,
-                "qa_report_json_url": f"/api/v1/videos/jobs/{record.job_id}/qa-report.json",
-                "qa_report_markdown_url": f"/api/v1/videos/jobs/{record.job_id}/qa-report.md",
-                "expires_at": expires_at,
-                "qa_summary": {
-                    "processed_frames": summary.processed_frames,
-                    "detection_totals": summary.detection_totals,
-                    "average_blur_reduction_pct": summary.average_blur_reduction_pct,
-                    "suspect_frame_count": len(summary.suspect_frames),
-                },
-            }
-            job_repository.update_status(
-                record.job_id,
-                status="completed",
-                progress={
-                    "percent": 100,
-                    "processed_frames": summary.processed_frames,
-                    "total_frames": max(summary.processed_frames, int(record.progress.get("total_frames", summary.processed_frames))),
-                    "eta_sec": 0,
-                },
-                result=result_payload,
-            )
+        if not needs_processing:
+            return output_path
+
+        config = record.config
+        privacy = config.get("privacy_options", {}) if isinstance(config, dict) else {}
+        candidate_actions = config.get("candidate_actions", {}) if isinstance(config, dict) else {}
+        summary = process_video_privacy(
+            upload_path=Path(record.upload_path),
+            output_path=output_path,
+            mode=str(config.get("mode", "video_privacy")) if isinstance(config, dict) else "video_privacy",
+            blur_faces=bool(privacy.get("blur_faces", True)),
+            blur_plates=bool(privacy.get("blur_plates", True)),
+            blur_text=bool(privacy.get("blur_text", True)),
+            allowlist_enabled=bool(privacy.get("allowlist_enabled", False)),
+            character_id=str(config.get("character_id")) if isinstance(config, dict) and config.get("character_id") else None,
+            analysis_id=str(config.get("analysis_id")) if isinstance(config, dict) and config.get("analysis_id") else None,
+            candidate_actions=candidate_actions if isinstance(candidate_actions, dict) else {},
+            candidate_references=self._load_candidate_references(config) if isinstance(config, dict) else [],
+        )
+        expires_at = record.result.get("expires_at") if isinstance(record.result, dict) else None
+        result_payload = {
+            "download_url": f"/api/v1/videos/jobs/{record.job_id}/result",
+            "preview_thumbnail_url": f"/api/v1/videos/jobs/{record.job_id}/thumbnail" if summary.preview_thumbnail else None,
+            "contact_sheet_url": f"/api/v1/videos/jobs/{record.job_id}/contact-sheet" if summary.contact_sheet else None,
+            "qa_report_json_url": f"/api/v1/videos/jobs/{record.job_id}/qa-report.json",
+            "qa_report_markdown_url": f"/api/v1/videos/jobs/{record.job_id}/qa-report.md",
+            "expires_at": expires_at,
+            "qa_summary": {
+                "processed_frames": summary.processed_frames,
+                "detection_totals": summary.detection_totals,
+                "average_blur_reduction_pct": summary.average_blur_reduction_pct,
+                "suspect_frame_count": len(summary.suspect_frames),
+                "candidate_enforcement": summary.candidate_enforcement,
+            },
+        }
+        job_repository.complete(
+            record.job_id,
+            progress={
+                "percent": 100,
+                "processed_frames": summary.processed_frames,
+                "total_frames": max(summary.processed_frames, int(record.progress.get("total_frames", summary.processed_frames))),
+                "eta_sec": 0,
+            },
+            result=result_payload,
+        )
         return output_path
 
-    def build_result_response(self, job_id: str) -> FileResponse:
+    def build_result_response(self, job_id: str, access_token: str | None) -> FileResponse:
         record = job_repository.get(job_id)
         if record is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"code": "JOB_NOT_FOUND", "message": "Video job was not found."},
             )
+        self._validate_access_token(record.access_token, access_token)
         if record.status != "completed":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={"code": "JOB_NOT_READY", "message": "Video job result is not ready yet."},
             )
-        output_path = self._ensure_result_artifact(record)
-        return FileResponse(path=output_path, filename=output_path.name, media_type=record.content_type or "video/mp4")
+        output_path = self._output_path(record)
+        if not output_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ARTIFACT_NOT_FOUND", "message": "Video job result was not found."},
+            )
+        return FileResponse(path=output_path, filename=output_path.name, media_type="video/mp4")
 
-    def build_job_artifact_response(self, job_id: str, artifact: str) -> FileResponse:
+    def build_job_artifact_response(self, job_id: str, artifact: str, access_token: str | None) -> FileResponse:
         record = job_repository.get(job_id)
         if record is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"code": "JOB_NOT_FOUND", "message": "Video job was not found."},
             )
+        self._validate_access_token(record.access_token, access_token)
         if record.status != "completed":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={"code": "JOB_NOT_READY", "message": "Video job artifact is not ready yet."},
             )
-        output_path = self._ensure_result_artifact(record)
+        output_path = self._output_path(record)
         artifact_path, media_type, filename = self._artifact_path(output_path, artifact)
         if not artifact_path.exists():
             raise HTTPException(
@@ -313,12 +488,19 @@ class VideoJobService:
             detail={"code": "ARTIFACT_NOT_FOUND", "message": "Video job artifact was not found."},
         )
 
-    def build_candidate_response(self, analysis_id: str, candidate_id: str) -> FileResponse:
+    def build_candidate_response(self, analysis_id: str, candidate_id: str, access_token: str | None) -> FileResponse:
         if not self.SAFE_ID.fullmatch(analysis_id) or not self.SAFE_ID.fullmatch(candidate_id):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"code": "CANDIDATE_NOT_FOUND", "message": "Video candidate was not found."},
             )
+        manifest = self._read_candidate_manifest(analysis_id)
+        if manifest is None or not isinstance(manifest.get("access_token"), str):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "CANDIDATE_NOT_FOUND", "message": "Video candidate was not found."},
+            )
+        self._validate_access_token(str(manifest["access_token"]), access_token)
         candidate_path = (self.candidate_dir / analysis_id / "faces" / f"{candidate_id}.jpg").resolve()
         faces_dir = (self.candidate_dir / analysis_id / "faces").resolve()
         if not candidate_path.is_relative_to(faces_dir) or not candidate_path.exists():

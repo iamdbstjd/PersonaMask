@@ -37,6 +37,7 @@ models/enhancers/
 /tmp/
 *.log
 data/
+test_video.mp4
 
 # Frontend build artifacts
 web/node_modules/

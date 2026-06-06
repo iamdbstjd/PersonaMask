@@ -32,14 +32,17 @@ class ApiTestCase(unittest.TestCase):
             "app.main.get_settings",
             "app.api.routers.allowlist.get_settings",
             "app.api.routers.diagnostics.get_settings",
+            "app.api.routers.realtime.get_settings",
             "app.api.routers.videos.get_settings",
         ):
             self._patches.enter_context(patch(target, return_value=self.settings))
         get_settings.cache_clear()
         with job_repository._lock:
             job_repository._jobs.clear()
+            job_repository._storage_file = None
         with session_repository._lock:
             session_repository._sessions.clear()
+            session_repository._storage_file = None
         self.client = TestClient(create_app())
 
     def tearDown(self) -> None:

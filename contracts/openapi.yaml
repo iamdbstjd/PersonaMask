@@ -1,12 +1,10 @@
 openapi: 3.1.0
 info:
-  title: Character Mask & Privacy Redaction API
+  title: PersonaMask Video Review API
   version: 0.1.0
   description: |
-    P0/P1 API contract skeleton derived from ARCHITECTURE.md.
-    Worker-3 owns the contract surface for frontend-backend integration,
-    especially realtime sessions, frame processing, allowlist, video jobs,
-    health, diagnostics, and common response/error envelopes.
+    Saved-video privacy review API with candidate inspection, protected artifacts,
+    realtime preview support, diagnostics, and common response/error envelopes.
 servers:
   - url: /
     description: Root server; paths retain the /api/v1 prefix.
@@ -305,6 +303,8 @@ paths:
           required: true
           schema:
             type: string
+        - $ref: '#/components/parameters/XAccessToken'
+        - $ref: '#/components/parameters/AccessToken'
       responses:
         '200':
           description: Candidate face image
@@ -323,6 +323,8 @@ paths:
       operationId: getVideoJob
       parameters:
         - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/XAccessToken'
+        - $ref: '#/components/parameters/AccessToken'
       responses:
         '200':
           description: Video job status
@@ -343,6 +345,8 @@ paths:
       operationId: downloadVideoJobResult
       parameters:
         - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/XAccessToken'
+        - $ref: '#/components/parameters/AccessToken'
       responses:
         '200':
           description: Result video file
@@ -368,6 +372,8 @@ paths:
       operationId: downloadVideoJobThumbnail
       parameters:
         - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/XAccessToken'
+        - $ref: '#/components/parameters/AccessToken'
       responses:
         '200':
           description: Result thumbnail image
@@ -386,6 +392,8 @@ paths:
       operationId: downloadVideoJobContactSheet
       parameters:
         - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/XAccessToken'
+        - $ref: '#/components/parameters/AccessToken'
       responses:
         '200':
           description: Before/after contact sheet image
@@ -404,6 +412,8 @@ paths:
       operationId: downloadVideoJobQaReportJson
       parameters:
         - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/XAccessToken'
+        - $ref: '#/components/parameters/AccessToken'
       responses:
         '200':
           description: Redaction QA report JSON
@@ -422,6 +432,8 @@ paths:
       operationId: downloadVideoJobQaReportMarkdown
       parameters:
         - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/XAccessToken'
+        - $ref: '#/components/parameters/AccessToken'
       responses:
         '200':
           description: Redaction QA report Markdown
@@ -439,6 +451,8 @@ paths:
       operationId: cancelVideoJob
       parameters:
         - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/XAccessToken'
+        - $ref: '#/components/parameters/AccessToken'
       responses:
         '200':
           description: Video job cancel accepted
@@ -470,6 +484,18 @@ components:
       name: job_id
       in: path
       required: true
+      schema:
+        type: string
+    AccessToken:
+      name: access_token
+      in: query
+      required: false
+      schema:
+        type: string
+    XAccessToken:
+      name: X-Access-Token
+      in: header
+      required: false
       schema:
         type: string
     XSessionId:
@@ -773,7 +799,7 @@ components:
           enum: [mp4]
         video_codec:
           type: string
-          enum: [h264]
+          enum: [mp4v]
         keep_audio:
           type: boolean
 
@@ -787,6 +813,10 @@ components:
         character_id:
           type: string
         analysis_id:
+          type:
+            - string
+            - 'null'
+        candidate_access_token:
           type:
             - string
             - 'null'
@@ -827,9 +857,11 @@ components:
           type: string
         data:
           type: object
-          required: [analysis_id, source_filename, candidates]
+          required: [analysis_id, access_token, source_filename, candidates]
           properties:
             analysis_id:
+              type: string
+            access_token:
               type: string
             source_filename:
               type: string
@@ -848,13 +880,15 @@ components:
           type: string
         data:
           type: object
-          required: [job_id, status, status_endpoint, cancel_endpoint]
+          required: [job_id, status, access_token, status_endpoint, cancel_endpoint]
           properties:
             job_id:
               type: string
             status:
               type: string
               enum: [queued]
+            access_token:
+              type: string
             status_endpoint:
               type: string
             cancel_endpoint:

@@ -19,8 +19,8 @@ class VideoPrivacyOptions(BaseModel):
 
 
 class VideoOutputOptions(BaseModel):
-    container: str = "mp4"
-    video_codec: str = "h264"
+    container: Literal["mp4"] = "mp4"
+    video_codec: Literal["mp4v"] = "mp4v"
     keep_audio: bool = False
 
 
@@ -28,6 +28,7 @@ class VideoJobCreateRequest(BaseModel):
     mode: VideoJobMode = "blur"
     character_id: str | None = None
     analysis_id: str | None = None
+    candidate_access_token: str | None = None
     candidate_actions: dict[str, CandidateAction] = Field(default_factory=dict)
     privacy_options: VideoPrivacyOptions = Field(default_factory=VideoPrivacyOptions)
     output_options: VideoOutputOptions = Field(default_factory=VideoOutputOptions)
@@ -60,6 +61,7 @@ class VideoJobData(BaseModel):
 class VideoJobCreateData(BaseModel):
     job_id: str
     status: VideoJobStatus
+    access_token: str
     status_endpoint: str
     cancel_endpoint: str
 
@@ -74,6 +76,7 @@ class VideoFaceCandidateData(BaseModel):
 
 class VideoCandidateAnalysisData(BaseModel):
     analysis_id: str
+    access_token: str
     source_filename: str
     candidates: list[VideoFaceCandidateData]
 

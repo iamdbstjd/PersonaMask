@@ -4,6 +4,7 @@ import base64
 import json
 from unittest.mock import patch
 
+from app.repositories.session_repository import session_repository
 from tests.support import ApiTestCase
 
 
@@ -52,6 +53,37 @@ class RealtimeAndContractTests(ApiTestCase):
         self.assertEqual(frame_meta["session_id"], session_payload["session_id"])
         self.assertIn("detections", frame_meta)
         self.assertIn("faces_total", frame_meta["detections"])
+
+    def test_realtime_session_repository_persists_local_state(self) -> None:
+        session_response = self.client.post(
+            "/api/v1/realtime/sessions",
+            json={
+                "mode": "privacy",
+                "stream_profile": {
+                    "target_fps": 8,
+                    "frame_width": 640,
+                    "jpeg_quality": 0.82,
+                    "response_mode": "binary_jpeg",
+                },
+                "privacy_options": {
+                    "blur_faces": True,
+                    "blur_plates": False,
+                    "blur_text": False,
+                    "allowlist_enabled": False,
+                },
+            },
+        )
+        self.assertEqual(session_response.status_code, 200)
+        session_id = session_response.json()["data"]["session_id"]
+        state_file = self.temp_path / "data" / "state" / "sessions.json"
+        self.assertTrue(state_file.exists())
+
+        with session_repository._lock:
+            session_repository._sessions.clear()
+            session_repository._storage_file = None
+        session_repository.configure_storage(str(self.temp_path / "data"))
+
+        self.assertIsNotNone(session_repository.get(session_id))
 
     def test_realtime_json_frame_response_matches_frontend_contract(self) -> None:
         session_response = self.client.post(
@@ -102,6 +134,53 @@ class RealtimeAndContractTests(ApiTestCase):
         self.assertEqual(payload["data"]["mime_type"], "image/jpeg")
         self.assertIn("detections", payload["data"])
         self.assertTrue(base64.b64decode(payload["data"]["processed_image_base64"]).startswith(b"\xff\xd8"))
+
+    def test_realtime_frame_rejects_oversized_payload(self) -> None:
+        session_response = self.client.post(
+            "/api/v1/realtime/sessions",
+            json={
+                "mode": "privacy",
+                "stream_profile": {
+                    "target_fps": 10,
+                    "frame_width": 720,
+                    "jpeg_quality": 0.76,
+                    "response_mode": "binary_jpeg",
+                },
+                "privacy_options": {
+                    "blur_faces": True,
+                    "blur_plates": False,
+                    "blur_text": False,
+                    "allowlist_enabled": False,
+                },
+            },
+        )
+        self.assertEqual(session_response.status_code, 200)
+        session_id = session_response.json()["data"]["session_id"]
+
+        frame_response = self.client.post(
+            f"/api/v1/realtime/sessions/{session_id}/frames",
+            files={"frame": ("huge.jpg", b"x" * (self.settings.max_realtime_frame_bytes + 1), "image/jpeg")},
+        )
+
+        self.assertEqual(frame_response.status_code, 413)
+        self.assertEqual(frame_response.json()["detail"]["code"], "FRAME_TOO_LARGE")
+
+    def test_allowlist_upload_rejects_non_image_payload(self) -> None:
+        media_response = self.client.post(
+            "/api/v1/allowlist/faces",
+            data={"label": "operator"},
+            files={"image": ("face.txt", b"not an image", "text/plain")},
+        )
+        self.assertEqual(media_response.status_code, 400)
+        self.assertEqual(media_response.json()["detail"]["code"], "UNSUPPORTED_MEDIA_TYPE")
+
+        decode_response = self.client.post(
+            "/api/v1/allowlist/faces",
+            data={"label": "operator"},
+            files={"image": ("face.jpg", b"not an image", "image/jpeg")},
+        )
+        self.assertEqual(decode_response.status_code, 400)
+        self.assertEqual(decode_response.json()["detail"]["code"], "INVALID_IMAGE_FILE")
 
     def test_presets_and_runtime_diagnostics_match_frontend_expectations(self) -> None:
         runtime_probe = {

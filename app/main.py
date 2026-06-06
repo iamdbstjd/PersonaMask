@@ -15,14 +15,15 @@ from app.api.routers.realtime import router as realtime_router
 from app.api.routers.videos import router as videos_router
 from app.core.config import get_settings
 from app.services.diagnostics_service import DiagnosticsService
+from app.services.video_job_service import VideoJobService
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
-        title="Character Mask & Privacy Redaction API",
+        title="PersonaMask Video Review API",
         version="0.1.0",
-        description="Minimal backend skeleton with health, diagnostics, presets, and --check runtime entrypoint.",
+        description="Saved-video privacy review API with candidate inspection, protected artifacts, and realtime preview support.",
     )
     app.include_router(health_router, prefix=settings.api_prefix)
     app.include_router(diagnostics_router, prefix=settings.api_prefix)
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
     app.include_router(allowlist_router, prefix=settings.api_prefix)
     app.include_router(realtime_router, prefix=settings.api_prefix)
     app.include_router(videos_router, prefix=settings.api_prefix)
+    VideoJobService(settings).resume_pending_jobs()
     return app
 
 
@@ -41,7 +43,7 @@ def run_check() -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Character Mask & Privacy backend")
+    parser = argparse.ArgumentParser(description="PersonaMask Video Review backend")
     parser.add_argument("--check", action="store_true", help="Print runtime diagnostics and exit")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", default=8000, type=int)

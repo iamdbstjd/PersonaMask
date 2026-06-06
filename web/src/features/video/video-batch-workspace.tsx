@@ -46,81 +46,87 @@ function formatVideoStatus(status: UseVideoJobResult["status"]): string {
 
 export function VideoBatchWorkspace({ controller }: VideoBatchWorkspaceProps) {
   const { config, selectedFile, dragActive, status, job, lastError } = controller;
+  const jobActive = status === "uploading" || status === "queued" || status === "processing";
+  const candidateCount = controller.candidateAnalysis?.candidates.length ?? 0;
+  const decisionCount = Object.keys(controller.candidateActions).length;
 
   return (
     <div className="stack-md">
       <ErrorNotice message={lastError} />
 
-      <div className="stack-lg">
-        <PanelCard
-          kicker="업로드 + 설정"
-          title="리뷰 렌더 준비"
-          description="소스 영상과 렌더 모드를 먼저 확정하고, 후보 얼굴 검토 기반의 저장 영상 결과를 생성합니다."
-          tone="accent"
-        >
-          <div className="stack-md">
-            <div className="cluster">
-              <StatusBadge label={selectedFile ? "파일 준비됨" : "파일 대기 중"} tone={selectedFile ? "success" : "neutral"} />
-              <StatusBadge label={`작업 상태 · ${formatVideoStatus(status)}`} tone={getStatusTone(status)} />
-              <StatusBadge label={controller.canCancel ? "취소 가능" : "취소 비활성"} tone="neutral" />
+      <div className="video-workspace-grid">
+        <div className="video-workspace-main">
+          <PanelCard kicker="업로드" title="소스 영상" tone="accent">
+            <div className="stack-md">
+              <div className="review-summary-strip">
+                <div>
+                  <span>파일</span>
+                  <strong>{selectedFile ? selectedFile.name : "대기 중"}</strong>
+                </div>
+                <div>
+                  <span>후보</span>
+                  <strong>{candidateCount}명</strong>
+                </div>
+                <div>
+                  <span>결정</span>
+                  <strong>{decisionCount}개</strong>
+                </div>
+                <StatusBadge label={formatVideoStatus(status)} tone={getStatusTone(status)} />
+              </div>
+
+              <VideoUploadDropzone
+                file={selectedFile}
+                disabled={jobActive}
+                dragActive={dragActive}
+                helperText="MP4, QuickTime, WebM"
+                errorMessage={null}
+                onFileSelected={controller.selectFile}
+                onDragActiveChange={controller.setDragActive}
+              />
             </div>
+          </PanelCard>
 
-            <VideoUploadDropzone
-              file={selectedFile}
-              disabled={status === "uploading" || status === "processing"}
-              dragActive={dragActive}
-              errorMessage={null}
-              onFileSelected={controller.selectFile}
-              onDragActiveChange={controller.setDragActive}
-            />
-          </div>
-        </PanelCard>
+          <CandidateReviewBoard
+            analysis={controller.candidateAnalysis}
+            actions={controller.candidateActions}
+            disabled={status === "uploading" || status === "processing" || status === "queued"}
+            isAnalyzing={controller.isAnalyzingCandidates}
+            canAnalyze={controller.canAnalyzeCandidates}
+            onAnalyze={controller.analyzeCandidates}
+            onActionChange={controller.updateCandidateAction}
+          />
+        </div>
 
-        <CandidateReviewBoard
-          analysis={controller.candidateAnalysis}
-          actions={controller.candidateActions}
-          disabled={status === "uploading" || status === "processing" || status === "queued"}
-          isAnalyzing={controller.isAnalyzingCandidates}
-          canAnalyze={controller.canAnalyzeCandidates}
-          onAnalyze={controller.analyzeCandidates}
-          onActionChange={controller.updateCandidateAction}
-        />
-
-        <PanelCard
-          kicker="배치 설정"
-          title="영상 리뷰 렌더 모드"
-          description="후보 검토 후 적용할 렌더 정책과 출력 옵션을 관리합니다."
-        >
-          <div className="stack-md">
-            <VideoConfigPanel
-              config={config}
-              disabled={status === "uploading"}
-              onModeChange={controller.updateMode}
-              onPrivacyOptionChange={controller.updatePrivacyOption}
-              onKeepAudioChange={controller.updateKeepAudio}
-              onResetDefaults={controller.resetConfig}
-            />
-            <div className="cluster">
-              <Button disabled={!controller.canSubmit} onClick={() => void controller.submit()} variant="primary">
-                리뷰 렌더 작업 제출
-              </Button>
-              <Button disabled={!controller.canCancel} onClick={() => void controller.cancel()} variant="secondary">
-                현재 작업 취소
-              </Button>
-              <Button onClick={controller.reset} variant="ghost">
-                화면 상태 초기화
-              </Button>
+        <aside className="video-workspace-side">
+          <PanelCard kicker="렌더 설정" title="처리 방식">
+            <div className="stack-md">
+              <StatusBadge label={selectedFile ? "제출 가능 상태 확인 중" : "파일 필요"} tone={selectedFile ? "success" : "neutral"} />
+              <VideoConfigPanel
+                config={config}
+                disabled={jobActive}
+                onModeChange={controller.updateMode}
+                onPrivacyOptionChange={controller.updatePrivacyOption}
+                onKeepAudioChange={controller.updateKeepAudio}
+                onResetDefaults={controller.resetConfig}
+              />
+              <div className="command-grid">
+                <Button disabled={!controller.canSubmit} onClick={() => void controller.submit()} variant="primary" fullWidth>
+                  렌더 제출
+                </Button>
+                <Button disabled={!controller.canCancel} onClick={() => void controller.cancel()} variant="secondary" fullWidth>
+                  작업 취소
+                </Button>
+                <Button onClick={controller.reset} variant="ghost" fullWidth>
+                  초기화
+                </Button>
+              </div>
             </div>
-          </div>
-        </PanelCard>
+          </PanelCard>
 
-        <PanelCard
-          kicker="QA 리포트"
-          title="리뷰 결과 다운로드"
-          description="완료된 저장 영상, 전후 비교 시트, QA 리포트를 함께 확인합니다."
-        >
-          <VideoResultCard status={status} result={job?.result ?? null} />
-        </PanelCard>
+          <PanelCard kicker="QA 리포트" title="결과">
+            <VideoResultCard accessToken={job?.accessToken ?? null} status={status} result={job?.result ?? null} />
+          </PanelCard>
+        </aside>
       </div>
     </div>
   );
