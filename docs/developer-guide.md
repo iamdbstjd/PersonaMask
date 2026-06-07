@@ -183,5 +183,4 @@ git diff --check
 - `data/`, `test_video.mp4`, `web/.next`, `web/node_modules` 같은 런타임 산출물과 의존성 폴더는 커밋하지 않습니다.
 - UI 변경은 가능하면 README 캡처와 설명을 함께 갱신합니다.
 - 커밋 메시지는 변경 이유를 첫 줄에 짧게 쓰고, 검증한 명령과 검증하지 못한 부분을 본문에 남깁니다.
-- 불필요한 공동 작성자 trailer나 도구 attribution은 커밋 메시지에 넣지 않습니다.
 - 푸시 전 `git log -1 --pretty=full`로 작성자, 커미터, 메시지를 확인합니다.
