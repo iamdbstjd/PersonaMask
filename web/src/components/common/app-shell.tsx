@@ -43,6 +43,7 @@ export function AppShell({
   const currentNav = NAV_ITEMS.find((item) => item.routeKey === currentRoute);
   const introClassName = ["page-intro", compactIntro ? "page-intro--compact" : null].filter(Boolean).join(" ");
   const shellClassName = ["page-shell", `page-shell--${currentRoute}`].join(" ");
+  const hasAside = Boolean(sideContent) || showDiagnostics;
 
   return (
     <div className={shellClassName}>
@@ -111,19 +112,21 @@ export function AppShell({
           )}
         </section>
 
-        <div className="content-layout">
+        <div className={["content-layout", hasAside ? null : "content-layout--single"].filter(Boolean).join(" ")}>
           <main>{children}</main>
-          <aside className="content-aside sticky-card">
-            {sideContent}
-            {showDiagnostics ? (
-              <DiagnosticsRail
-                items={diagnosticsItems}
-                activeMode={currentNav?.label ?? currentRoute}
-                activePreset={activePreset}
-                lastError={lastError}
-              />
-            ) : null}
-          </aside>
+          {hasAside ? (
+            <aside className="content-aside sticky-card">
+              {sideContent}
+              {showDiagnostics ? (
+                <DiagnosticsRail
+                  items={diagnosticsItems}
+                  activeMode={currentNav?.label ?? currentRoute}
+                  activePreset={activePreset}
+                  lastError={lastError}
+                />
+              ) : null}
+            </aside>
+          ) : null}
         </div>
       </div>
 

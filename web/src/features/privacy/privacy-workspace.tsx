@@ -11,11 +11,9 @@ import { useFrameUploader } from "../../hooks/useFrameUploader";
 import { useRealtimeSession } from "../../hooks/useRealtimeSession";
 import { diagnosticsStore, useDiagnosticsStore } from "../../store/diagnostics-store";
 import { useSessionStore } from "../../store/session-store";
-import { AllowlistStatusCard } from "./allowlist-status-card";
-import { DetectionSummaryCard } from "./detection-summary-card";
 import { GuidedFaceCaptureCard } from "./guided-face-capture-card";
 import { PrivacyOptionsForm } from "./privacy-options-form";
-import { SessionControlCard } from "./session-control-card";
+import { PrivacyRuntimePanel } from "./privacy-runtime-panel";
 
 const DEFAULT_STREAM_PROFILE: StreamProfile = {
   targetFps: 8,
@@ -98,23 +96,8 @@ export function PrivacyWorkspace() {
   }, []);
 
   return (
-    <section className="workspace-layout workspace-layout--three">
-      <div className="stack-md">
-        <PrivacyOptionsForm value={privacyOptions} onChange={setPrivacyOptions} disabled={Boolean(sessionSnapshot.sessionId)} />
-        <GuidedFaceCaptureCard
-          cameraActive={camera.isActive}
-          cameraStarting={camera.isStarting}
-          onStartCamera={camera.startCamera}
-          captureFrame={camera.captureFrame}
-        />
-        <AllowlistStatusCard
-          allowlistEnabled={privacyOptions.allowlistEnabled}
-          apiStatus={diagnosticsSnapshot.apiStatus}
-          queueDepth={diagnosticsSnapshot.queueDepth}
-        />
-      </div>
-
-      <div className="stack-md">
+    <section className="privacy-console">
+      <div className="privacy-stage">
         <CameraViewport
           videoRef={camera.videoRef}
           permission={camera.permission}
@@ -132,13 +115,27 @@ export function PrivacyWorkspace() {
         />
       </div>
 
-      <div className="stack-md">
-        <SessionControlCard
+      <aside className="privacy-control-stack">
+        <PrivacyOptionsForm value={privacyOptions} onChange={setPrivacyOptions} disabled={Boolean(sessionSnapshot.sessionId)} />
+        <GuidedFaceCaptureCard
+          cameraActive={camera.isActive}
+          cameraStarting={camera.isStarting}
+          onStartCamera={camera.startCamera}
+          captureFrame={camera.captureFrame}
+        />
+        <PrivacyRuntimePanel
           status={sessionSnapshot.status}
           sessionId={sessionSnapshot.sessionId}
           isCameraReady={sessionSnapshot.isCameraReady}
           isBusy={realtimeSession.isBusy}
           isUploading={sessionSnapshot.isUploading}
+          detections={sessionSnapshot.lastDetectionCounts}
+          latencyMs={sessionSnapshot.lastServerLatencyMs}
+          lastRequestId={sessionSnapshot.lastRequestId}
+          lastError={sessionSnapshot.lastError ?? diagnosticsSnapshot.lastError}
+          allowlistEnabled={privacyOptions.allowlistEnabled}
+          apiStatus={diagnosticsSnapshot.apiStatus}
+          queueDepth={diagnosticsSnapshot.queueDepth}
           onStartSession={() => {
             void realtimeSession.startSession();
           }}
@@ -146,13 +143,7 @@ export function PrivacyWorkspace() {
             void realtimeSession.stopSession();
           }}
         />
-        <DetectionSummaryCard
-          detections={sessionSnapshot.lastDetectionCounts}
-          latencyMs={sessionSnapshot.lastServerLatencyMs}
-          lastRequestId={sessionSnapshot.lastRequestId}
-          lastError={sessionSnapshot.lastError ?? diagnosticsSnapshot.lastError}
-        />
-      </div>
+      </aside>
     </section>
   );
 }

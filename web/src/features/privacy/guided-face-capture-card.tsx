@@ -141,8 +141,8 @@ export function GuidedFaceCaptureCard({ cameraActive, cameraStarting, onStartCam
   return (
     <PanelCard
       kicker="허용 얼굴 등록"
-      title="다각도 얼굴 캡처"
-      description="카메라를 보며 정면, 45도, 측면 참고 이미지를 채우면 같은 인물을 허용 목록으로 사용할 수 있습니다."
+      title="다각도 캡처"
+      description="정면, 45도, 측면 이미지를 채워 허용 인물을 등록합니다."
       tone="accent"
     >
       <div className="guided-capture">
@@ -209,7 +209,7 @@ export function GuidedFaceCaptureCard({ cameraActive, cameraStarting, onStartCam
           </p>
         ) : (
           <p className="guided-capture__guidance">
-            카메라 프리뷰를 켠 뒤 한 각도씩 천천히 저장하세요.
+            카메라를 켜고 한 각도씩 저장하세요.
           </p>
         )}
         {lastError ? <p className="guided-capture__error">{lastError}</p> : null}
