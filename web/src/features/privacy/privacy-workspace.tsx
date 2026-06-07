@@ -13,6 +13,7 @@ import { diagnosticsStore, useDiagnosticsStore } from "../../store/diagnostics-s
 import { useSessionStore } from "../../store/session-store";
 import { AllowlistStatusCard } from "./allowlist-status-card";
 import { DetectionSummaryCard } from "./detection-summary-card";
+import { GuidedFaceCaptureCard } from "./guided-face-capture-card";
 import { PrivacyOptionsForm } from "./privacy-options-form";
 import { SessionControlCard } from "./session-control-card";
 
@@ -100,6 +101,12 @@ export function PrivacyWorkspace() {
     <section className="workspace-layout workspace-layout--three">
       <div className="stack-md">
         <PrivacyOptionsForm value={privacyOptions} onChange={setPrivacyOptions} disabled={Boolean(sessionSnapshot.sessionId)} />
+        <GuidedFaceCaptureCard
+          cameraActive={camera.isActive}
+          cameraStarting={camera.isStarting}
+          onStartCamera={camera.startCamera}
+          captureFrame={camera.captureFrame}
+        />
         <AllowlistStatusCard
           allowlistEnabled={privacyOptions.allowlistEnabled}
           apiStatus={diagnosticsSnapshot.apiStatus}

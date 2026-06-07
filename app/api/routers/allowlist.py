@@ -18,21 +18,29 @@ async def create_allowlist_face(
     image: UploadFile = File(...),
     label: str = Form(...),
     note: str | None = Form(default=None),
+    pose_slot: str = Form(default=""),
+    enrollment_id: str = Form(default=""),
 ) -> dict[str, object]:
     service = AllowlistService(get_settings())
-    item = await service.register_face(image=image, label=label, note=note)
+    item = await service.register_face(
+        image=image,
+        label=label,
+        note=note,
+        pose_slot=pose_slot or None,
+        enrollment_id=enrollment_id or None,
+    )
     return {"request_id": _request_id(request, "generated-allowlist-create-request"), "data": item.model_dump(), "error": None}
 
 
 @router.get("/allowlist/faces")
-def list_allowlist_faces(request: Request) -> dict[str, object]:
+async def list_allowlist_faces(request: Request) -> dict[str, object]:
     service = AllowlistService(get_settings())
     items = service.list_faces()
     return {"request_id": _request_id(request, "generated-allowlist-list-request"), "data": items.model_dump(), "error": None}
 
 
 @router.delete("/allowlist/faces/{person_id}")
-def delete_allowlist_face(person_id: str, request: Request) -> dict[str, object]:
+async def delete_allowlist_face(person_id: str, request: Request) -> dict[str, object]:
     service = AllowlistService(get_settings())
     deleted = service.delete_face(person_id)
     return {"request_id": _request_id(request, "generated-allowlist-delete-request"), "data": deleted.model_dump(), "error": None}

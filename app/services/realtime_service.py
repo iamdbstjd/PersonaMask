@@ -24,6 +24,7 @@ from app.schemas.realtime import (
     RealtimeSessionCreateRequest,
     RealtimeSessionData,
 )
+from app.services.allowlist_service import AllowlistService
 
 
 class RealtimeService:
@@ -106,12 +107,15 @@ class RealtimeService:
             ) from exc
 
         if session.mode == "privacy":
+            allowlist_enabled = bool(session.privacy_options.get("allowlist_enabled", False))
+            allowlist_references = AllowlistService(self.settings).candidate_references() if allowlist_enabled else ()
             processing = apply_privacy_effects(
                 decoded,
                 blur_faces=bool(session.privacy_options.get("blur_faces", True)),
                 blur_plates=bool(session.privacy_options.get("blur_plates", False)),
                 blur_text=bool(session.privacy_options.get("blur_text", False)),
-                allowlist_enabled=bool(session.privacy_options.get("allowlist_enabled", False)),
+                allowlist_enabled=allowlist_enabled,
+                allowlist_references=allowlist_references,
             )
         else:
             processing = apply_character_effects(decoded, session.preset_id)

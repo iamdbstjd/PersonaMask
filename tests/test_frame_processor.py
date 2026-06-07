@@ -46,6 +46,34 @@ class FrameProcessorTests(unittest.TestCase):
         self.assertTrue(np.array_equal(result.image_bgr[large_face.y1:large_face.y2, large_face.x1:large_face.x2], image[large_face.y1:large_face.y2, large_face.x1:large_face.x2]))
         self.assertFalse(np.array_equal(result.image_bgr[small_face.y1:small_face.y2, small_face.x1:small_face.x2], image[small_face.y1:small_face.y2, small_face.x1:small_face.x2]))
 
+    def test_privacy_allowlist_preserves_registered_reference_not_largest_face(self) -> None:
+        image = np.full((160, 180, 3), (20, 28, 42), dtype=np.uint8)
+        allowed_face = FaceBox(x1=16, y1=30, x2=58, y2=86)
+        other_face = FaceBox(x1=92, y1=36, x2=164, y2=126)
+        image[allowed_face.y1:allowed_face.y2, allowed_face.x1:allowed_face.x2] = (32, 180, 72)
+        image[other_face.y1:other_face.y2, other_face.x1:other_face.x2] = (210, 68, 42)
+        image[other_face.y1:other_face.y2:2, other_face.x1:other_face.x2] = (24, 120, 220)
+        reference = CandidateReference(
+            candidate_id="person_slot_front",
+            action="preserve",
+            image_bgr=_crop_face_with_padding(image, allowed_face),
+        )
+
+        with patch("app.pipelines.frame_processor.detect_face_details", return_value=_detections(other_face, allowed_face)):
+            result = apply_privacy_effects(
+                image,
+                blur_faces=True,
+                blur_plates=False,
+                blur_text=False,
+                allowlist_enabled=True,
+                allowlist_references=[reference],
+            )
+
+        self.assertEqual(result.candidate_matches["person_slot_front"], 1)
+        self.assertEqual(result.detections.faces_redacted, 1)
+        self.assertTrue(np.array_equal(result.image_bgr[allowed_face.y1:allowed_face.y2, allowed_face.x1:allowed_face.x2], image[allowed_face.y1:allowed_face.y2, allowed_face.x1:allowed_face.x2]))
+        self.assertFalse(np.array_equal(result.image_bgr[other_face.y1:other_face.y2, other_face.x1:other_face.x2], image[other_face.y1:other_face.y2, other_face.x1:other_face.x2]))
+
     def test_character_effects_keep_background_intact_when_face_is_detected(self) -> None:
         image = _random_image()
         primary_face = FaceBox(x1=56, y1=42, x2=104, y2=110)

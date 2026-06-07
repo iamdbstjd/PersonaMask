@@ -6,6 +6,7 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
 from app.core.config import get_settings
+from app.services.allowlist_service import AllowlistService
 from app.services.realtime_service import RealtimeService
 from app.schemas.realtime import RealtimeSessionCreateRequest
 
@@ -32,6 +33,17 @@ def delete_realtime_session(session_id: str, request: Request) -> dict[str, obje
         "data": {"session_id": session_id, "deleted": deleted},
         "error": None,
     }
+
+
+@router.post("/realtime/face-pose")
+async def estimate_realtime_face_pose(
+    request: Request,
+    frame: UploadFile = File(...),
+    completed_slots: str | None = Form(default=None),
+) -> dict[str, object]:
+    service = AllowlistService(get_settings())
+    pose = await service.estimate_face_pose(image=frame, completed_slots=completed_slots)
+    return {"request_id": _request_id(request, "generated-face-pose-request"), "data": pose.model_dump(), "error": None}
 
 
 @router.post("/realtime/sessions/{session_id}/frames")

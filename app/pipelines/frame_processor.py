@@ -413,16 +413,26 @@ def apply_privacy_effects(
     blur_plates: bool,
     blur_text: bool,
     allowlist_enabled: bool,
+    allowlist_references: Sequence[CandidateReference] | None = None,
 ) -> ProcessingResult:
     output = image_bgr.copy()
-    faces = [detection.box for detection in detect_face_details(output)]
+    face_detections = detect_face_details(output)
+    faces = [detection.box for detection in face_detections]
     primary = _largest_face(faces)
+    references = tuple(allowlist_references or ()) if allowlist_enabled else ()
+    allowlist_matches = _match_candidate_actions(image_bgr, face_detections, references)
+    fallback_reference_face = None if references else primary if allowlist_enabled and primary is not None else None
     faces_redacted = 0
     redacted_regions: list[FaceBox] = []
+    matched_counts: dict[str, int] = {}
 
     if blur_faces:
         for face in faces:
-            if allowlist_enabled and primary is not None and face == primary:
+            reference = allowlist_matches.get(face)
+            if reference is not None and reference.action in {"preserve", "track"}:
+                matched_counts[reference.candidate_id] = matched_counts.get(reference.candidate_id, 0) + 1
+                continue
+            if fallback_reference_face is not None and face == fallback_reference_face:
                 continue
             _blur_region(output, face)
             faces_redacted += 1
@@ -451,6 +461,7 @@ def apply_privacy_effects(
         ),
         primary_face=primary,
         redacted_regions=tuple(redacted_regions),
+        candidate_matches=matched_counts,
     )
 
 

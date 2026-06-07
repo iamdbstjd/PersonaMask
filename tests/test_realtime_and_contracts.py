@@ -4,6 +4,7 @@ import base64
 import json
 from unittest.mock import patch
 
+from app.pipelines.frame_processor import FaceBox, FaceDetection
 from app.repositories.session_repository import session_repository
 from tests.support import ApiTestCase
 
@@ -181,6 +182,45 @@ class RealtimeAndContractTests(ApiTestCase):
         )
         self.assertEqual(decode_response.status_code, 400)
         self.assertEqual(decode_response.json()["detail"]["code"], "INVALID_IMAGE_FILE")
+
+    def test_guided_face_pose_endpoint_returns_capture_slot(self) -> None:
+        with patch(
+            "app.services.allowlist_service.detect_face_details",
+            return_value=[FaceDetection(box=FaceBox(x1=28, y1=12, x2=70, y2=58), confidence=0.95)],
+        ):
+            response = self.client.post(
+                "/api/v1/realtime/face-pose",
+                data={"completed_slots": json.dumps(["left_45"])},
+                files={"frame": ("frame.jpg", self.make_image_bytes(), "image/jpeg")},
+                headers={"X-Request-Id": "pose-1"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["request_id"], "pose-1")
+        self.assertTrue(payload["data"]["detected"])
+        self.assertEqual(payload["data"]["pose_slot"], "front")
+        self.assertEqual(payload["data"]["pose_label"], "정면")
+        self.assertFalse(payload["data"]["already_captured"])
+        self.assertIn("guidance", payload["data"])
+
+    def test_allowlist_upload_accepts_guided_pose_metadata(self) -> None:
+        response = self.client.post(
+            "/api/v1/allowlist/faces",
+            data={
+                "label": "operator",
+                "note": "guided front capture",
+                "pose_slot": "front",
+                "enrollment_id": "enroll_test_1",
+            },
+            files={"image": ("face.jpg", self.make_image_bytes(), "image/jpeg")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        item = response.json()["data"]
+        self.assertEqual(item["label"], "operator")
+        self.assertEqual(item["pose_slot"], "front")
+        self.assertEqual(item["enrollment_id"], "enroll_test_1")
 
     def test_presets_and_runtime_diagnostics_match_frontend_expectations(self) -> None:
         runtime_probe = {

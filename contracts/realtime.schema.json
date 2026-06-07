@@ -20,6 +20,9 @@
       "$ref": "#/$defs/RealtimeSessionDeleteResponse"
     },
     {
+      "$ref": "#/$defs/FacePoseEstimateResponse"
+    },
+    {
       "$ref": "#/$defs/RealtimeFrameMeta"
     },
     {
@@ -233,6 +236,79 @@
         },
         "data": {
           "$ref": "#/$defs/RealtimeSessionDeleteData"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    "FacePoseEstimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "detected",
+        "confidence",
+        "already_captured",
+        "completed_count",
+        "required_count",
+        "next_slots",
+        "guidance"
+      ],
+      "properties": {
+        "detected": {
+          "type": "boolean"
+        },
+        "pose_slot": {
+          "type": ["string", "null"],
+          "enum": ["front", "left_45", "right_45", "left_profile", "right_profile", null]
+        },
+        "pose_label": {
+          "type": ["string", "null"]
+        },
+        "confidence": {
+          "type": "number"
+        },
+        "face_bbox": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "integer"
+          }
+        },
+        "already_captured": {
+          "type": "boolean"
+        },
+        "completed_count": {
+          "type": "integer"
+        },
+        "required_count": {
+          "type": "integer"
+        },
+        "next_slots": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["front", "left_45", "right_45", "left_profile", "right_profile"]
+          }
+        },
+        "guidance": {
+          "type": "string"
+        }
+      }
+    },
+    "FacePoseEstimateResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "data",
+        "error"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/FacePoseEstimate"
         },
         "error": {
           "type": "null"
