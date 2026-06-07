@@ -1625,33 +1625,6 @@ body::before {
   text-align: center;
 }
 
-.dropzone > .cluster-between {
-  display: grid;
-  justify-items: center;
-  justify-content: center;
-  gap: 0.65rem;
-}
-
-.dropzone > .cluster-between > .status-badge {
-  display: none;
-}
-
-.dropzone__icon {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  color: #70778d;
-  font-size: 0;
-}
-
-.dropzone__icon::before {
-  content: "⇧";
-  font-size: 2rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
 .dropzone__file {
   width: min(100%, 500px);
   min-height: 128px;
@@ -2240,15 +2213,61 @@ body::before {
 
 .page-shell--video .dropzone {
   min-height: 226px;
-  padding: 1rem 1.2rem;
+  padding: 1.25rem 1.4rem;
   border-color: #c0c8de;
   background: #ffffff;
 }
 
+.page-shell--video .dropzone__body {
+  width: min(100%, 560px);
+  display: grid;
+  justify-items: center;
+  gap: 0.48rem;
+  margin-inline: auto;
+  text-align: center;
+}
+
+.page-shell--video .dropzone__body .status-badge {
+  display: none;
+}
+
+.page-shell--video .dropzone__title {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.02rem;
+  font-weight: 800;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
+.page-shell--video .dropzone__helper {
+  margin: 0;
+  color: #3b4358;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
 .page-shell--video .dropzone__file {
-  width: min(100%, 680px);
-  min-height: 72px;
+  width: min(100%, 640px);
+  min-height: 76px;
   background: #f1f5ff;
+  justify-items: center;
+  padding: 1rem 1.4rem;
+  text-align: center;
+}
+
+.page-shell--video .dropzone__file strong {
+  max-width: 100%;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+
+.page-shell--video .dropzone__file span {
+  color: #344054;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  word-break: keep-all;
 }
 
 .page-shell--video .candidate-board {
@@ -2345,8 +2364,16 @@ body::before {
 
 .page-shell--video .review-control-panel .toggle-card,
 .page-shell--video .review-control-panel .toggle-card--checked {
-  min-height: 32px;
-  padding: 0.15rem 0;
+  min-height: 42px;
+  padding: 0.42rem 0.58rem;
+  border-radius: 12px;
+  border-color: #e0e5f2;
+  background: #fbfcff;
+}
+
+.page-shell--video .review-control-panel .toggle-card--checked {
+  border-color: #cad7f3;
+  background: #f1f5ff;
 }
 
 .page-shell--video .review-control-panel .summary-grid {

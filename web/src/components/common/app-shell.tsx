@@ -87,7 +87,6 @@ export function AppShell({
       <div className="page-shell__inner">
         <section className={introClassName}>
           <div className="page-intro__copy">
-            <p className="eyebrow">실시간 미디어 작업 흐름</p>
             <h1>{title}</h1>
             <p className="hero-card__description">{description}</p>
             {compactIntro ? (
@@ -129,9 +128,9 @@ export function AppShell({
       </div>
 
       <footer className="app-footer">
-        <span>© 2024 PersonaMask 콘솔 · 보안 등급 영상 처리 인터페이스</span>
-        <a href="/privacy">Privacy Policy</a>
-        <a href="/settings">Terms of Service</a>
+        <span>© 2026 PersonaMask 콘솔 · 보안 등급 영상 처리 인터페이스</span>
+        <a href="/privacy">개인정보 처리방침</a>
+        <a href="/settings">이용약관</a>
       </footer>
     </div>
   );

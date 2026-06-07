@@ -61,7 +61,7 @@ export function VideoPageScreen() {
   return (
     <AppShell
       currentRoute="video"
-      title="저장 영상 리뷰"
+      title="영상 리뷰"
       description="소스 영상을 선택하고, 인물 처리 결정을 확인한 뒤 렌더와 QA 리포트를 한 번에 관리합니다."
       diagnosticsItems={diagnosticsItems}
       activePreset="리뷰 렌더 설정"

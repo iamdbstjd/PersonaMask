@@ -25,7 +25,7 @@ const modeCards = [
   },
   {
     href: "/video",
-    title: "저장 영상 리뷰",
+    title: "영상 리뷰",
     summary: "영상을 업로드하고 후보 얼굴을 검토한 뒤 보존/캐릭터/블러 렌더 결과를 다운로드합니다.",
     status: "연결됨",
     highlights: ["후보 분석", "리뷰 렌더 모드", "결과 다운로드"],
@@ -106,7 +106,7 @@ export default function HomePage() {
         <div className="auto-grid">
           <PanelCard kicker="운영 메모" title="먼저 확인할 것" description="각 흐름에 들어가기 전 확인할 핵심 항목을 정리했습니다.">
             <ul className="notes-list">
-              <li>저장 영상 리뷰가 핵심 제품 흐름이며, 실시간 화면은 프리뷰와 보정 용도입니다.</li>
+              <li>영상 리뷰가 핵심 제품 흐름이며, 실시간 화면은 프리뷰와 보정 용도입니다.</li>
               <li>보존/캐릭터 모드는 허용 목록 정책을 기준으로 남길 얼굴과 대체할 얼굴을 판단합니다.</li>
               <li>후보 분석은 렌더 작업 전에 검토 가능한 얼굴 crop을 준비합니다.</li>
             </ul>
