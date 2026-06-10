@@ -15,7 +15,6 @@ class VideoPrivacyOptions(BaseModel):
     blur_faces: bool = True
     blur_plates: bool = True
     blur_text: bool = True
-    allowlist_enabled: bool = False
 
 
 class VideoOutputOptions(BaseModel):

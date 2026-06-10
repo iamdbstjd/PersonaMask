@@ -20,7 +20,6 @@ export type PrivacyOptions = {
   blur_faces: boolean;
   blur_plates: boolean;
   blur_text: boolean;
-  allowlist_enabled: boolean;
 };
 
 export type OutputOptions = {
@@ -57,6 +56,13 @@ export type VideoJobResult = {
     detection_totals?: Record<string, number>;
     average_blur_reduction_pct?: number | null;
     suspect_frame_count?: number;
+    character_style?: {
+      enabled?: boolean;
+      preset_id?: string | null;
+      model?: string | null;
+      generated_count?: number;
+      warnings?: string[];
+    };
   } | null;
   expires_at: string | null;
 };
@@ -124,15 +130,14 @@ export type FetchLike = typeof fetch;
 
 export const DEFAULT_VIDEO_JOB_CONFIG: VideoJobConfig = {
   mode: "blur",
-  character_id: "spider",
+  character_id: "anime_portrait",
   analysis_id: null,
   candidate_access_token: null,
   candidate_actions: {},
   privacy_options: {
     blur_faces: true,
-    blur_plates: true,
-    blur_text: true,
-    allowlist_enabled: false,
+    blur_plates: false,
+    blur_text: false,
   },
   output_options: {
     container: "mp4",

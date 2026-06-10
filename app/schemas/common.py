@@ -30,4 +30,4 @@ class PresetItem(BaseModel):
     label: str
     mode: str = Field(default="character")
     thumbnail_url: str
-    supports_realtime: bool = True
+    engine: str = Field(default="diffusion_img2img")

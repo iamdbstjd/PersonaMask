@@ -9,6 +9,7 @@ from threading import Lock
 from typing import Any
 from typing import Callable
 from typing import Iterable
+from typing import Mapping
 from typing import Sequence
 
 import cv2
@@ -52,6 +53,7 @@ class ProcessingDetections:
     faces_redacted: int
     plates_redacted: int
     text_regions_redacted: int
+    faces_stylized: int = 0
 
 
 @dataclass(frozen=True)
@@ -69,6 +71,15 @@ class CandidateReference:
     action: str
     image_bgr: np.ndarray
     embedding: tuple[float, ...] | None = None
+
+
+@dataclass(frozen=True)
+class CharacterStyleAsset:
+    candidate_id: str
+    image_bgr: np.ndarray
+    engine: str
+    prompt: str
+    artifact_path: str | None = None
 
 
 StyleTransformer = Callable[[np.ndarray], np.ndarray]
@@ -406,102 +417,23 @@ def _detect_plate_candidates(image_bgr: np.ndarray) -> list[FaceBox]:
     return candidates[:2]
 
 
-def apply_privacy_effects(
-    image_bgr: np.ndarray,
-    *,
-    blur_faces: bool,
-    blur_plates: bool,
-    blur_text: bool,
-    allowlist_enabled: bool,
-    allowlist_references: Sequence[CandidateReference] | None = None,
-) -> ProcessingResult:
-    output = image_bgr.copy()
-    face_detections = detect_face_details(output)
-    faces = [detection.box for detection in face_detections]
-    primary = _largest_face(faces)
-    references = tuple(allowlist_references or ()) if allowlist_enabled else ()
-    allowlist_matches = _match_candidate_actions(image_bgr, face_detections, references)
-    fallback_reference_face = None if references else primary if allowlist_enabled and primary is not None else None
-    faces_redacted = 0
-    redacted_regions: list[FaceBox] = []
-    matched_counts: dict[str, int] = {}
-
-    if blur_faces:
-        for face in faces:
-            reference = allowlist_matches.get(face)
-            if reference is not None and reference.action in {"preserve", "track"}:
-                matched_counts[reference.candidate_id] = matched_counts.get(reference.candidate_id, 0) + 1
-                continue
-            if fallback_reference_face is not None and face == fallback_reference_face:
-                continue
-            _blur_region(output, face)
-            faces_redacted += 1
-            redacted_regions.append(face)
-
-    plate_boxes = _detect_plate_candidates(image_bgr) if blur_plates else []
-    for plate in plate_boxes:
-        _blur_region(output, plate)
-        redacted_regions.append(plate)
-
-    text_regions_redacted = 0
-    if blur_text:
-        height, width = output.shape[:2]
-        text_band = FaceBox(x1=0, y1=0, x2=width, y2=max(1, int(height * 0.16)))
-        _blur_region(output, text_band)
-        redacted_regions.append(text_band)
-        text_regions_redacted = 1
-
-    return ProcessingResult(
-        image_bgr=output,
-        detections=ProcessingDetections(
-            faces_total=len(faces),
-            faces_redacted=faces_redacted,
-            plates_redacted=len(plate_boxes),
-            text_regions_redacted=text_regions_redacted,
-        ),
-        primary_face=primary,
-        redacted_regions=tuple(redacted_regions),
-        candidate_matches=matched_counts,
-    )
-
-
-def _draw_spider_overlay(image_bgr: np.ndarray) -> np.ndarray:
-    tinted = image_bgr.astype(np.float32)
-    tinted[:, :, 2] = np.clip(tinted[:, :, 2] * 1.24, 0, 255)
-    tinted[:, :, 1] = np.clip(tinted[:, :, 1] * 0.58, 0, 255)
-    tinted[:, :, 0] = np.clip(tinted[:, :, 0] * 0.58, 0, 255)
-    output = tinted.astype(np.uint8)
-
-    h, w = output.shape[:2]
-    for x in range(0, w, 42):
-        cv2.line(output, (x, 0), (x, h), (20, 20, 20), 1, cv2.LINE_AA)
-    for y in range(0, h, 42):
-        cv2.line(output, (0, y), (w, y), (20, 20, 20), 1, cv2.LINE_AA)
-    return output
-
-
-def _draw_bat_overlay(image_bgr: np.ndarray) -> np.ndarray:
-    dark = cv2.convertScaleAbs(image_bgr, alpha=0.7, beta=-10)
-    overlay = dark.copy()
-    h, w = overlay.shape[:2]
-    cv2.rectangle(overlay, (0, int(h * 0.58)), (w, h), (15, 15, 25), thickness=-1)
-    return cv2.addWeighted(overlay, 0.35, dark, 0.65, 0)
-
-
-def _draw_anime_overlay(image_bgr: np.ndarray) -> np.ndarray:
+def _draw_privacy_avatar_overlay(image_bgr: np.ndarray) -> np.ndarray:
     color = cv2.bilateralFilter(image_bgr, 9, 90, 90)
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
     edges = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 9, 7)
     return cv2.bitwise_and(color, color, mask=edges)
 
 
-def _style_transformer(preset_id: str | None) -> StyleTransformer:
-    preset = (preset_id or "spider").lower()
-    if preset == "bat":
-        return _draw_bat_overlay
-    if preset in {"anime", "anime_mask"}:
-        return _draw_anime_overlay
-    return _draw_spider_overlay
+def _fallback_style_transformer(_: str | None) -> StyleTransformer:
+    return _draw_privacy_avatar_overlay
+
+
+def _apply_face_asset(image_bgr: np.ndarray, face: FaceBox, asset: CharacterStyleAsset) -> np.ndarray:
+    return _apply_face_transform(
+        image_bgr,
+        face,
+        lambda roi: cv2.resize(asset.image_bgr, (roi.shape[1], roi.shape[0]), interpolation=cv2.INTER_CUBIC),
+    )
 
 
 def apply_video_review_effects(
@@ -511,9 +443,9 @@ def apply_video_review_effects(
     blur_faces: bool,
     blur_plates: bool,
     blur_text: bool,
-    allowlist_enabled: bool,
     character_id: str | None = None,
     candidate_references: Sequence[CandidateReference] | None = None,
+    character_style_assets: Mapping[str, CharacterStyleAsset] | None = None,
 ) -> ProcessingResult:
     review_mode = "blur" if mode == "video_privacy" else mode
     output = image_bgr.copy()
@@ -521,11 +453,12 @@ def apply_video_review_effects(
     faces = [detection.box for detection in face_detections]
     primary = _largest_face(faces)
     references = tuple(candidate_references or ())
+    style_assets = character_style_assets or {}
     candidate_matches = _match_candidate_actions(image_bgr, face_detections, references)
-    reference_face = None if references else primary if allowlist_enabled and primary is not None else None
     faces_redacted = 0
+    faces_stylized = 0
     redacted_regions: list[FaceBox] = []
-    transform_faces: list[FaceBox] = []
+    transform_faces: list[tuple[FaceBox, CharacterStyleAsset | None]] = []
     matched_counts: dict[str, int] = {}
 
     for face in faces:
@@ -535,16 +468,14 @@ def apply_video_review_effects(
             if candidate_reference.action in {"preserve", "track"}:
                 continue
             if candidate_reference.action == "character":
-                transform_faces.append(face)
+                transform_faces.append((face, style_assets.get(candidate_reference.candidate_id)))
+                faces_redacted += 1
+                faces_stylized += 1
+                redacted_regions.append(face)
                 continue
             _blur_region(output, face)
             faces_redacted += 1
             redacted_regions.append(face)
-            continue
-
-        if reference_face is not None and face == reference_face and review_mode in {"preserve", "character"}:
-            if review_mode == "character":
-                transform_faces.append(face)
             continue
 
         if blur_faces:
@@ -552,9 +483,9 @@ def apply_video_review_effects(
             faces_redacted += 1
             redacted_regions.append(face)
 
-    transformer = _style_transformer(character_id)
-    for face in transform_faces:
-        output = _apply_face_transform(output, face, transformer)
+    fallback_transformer = _fallback_style_transformer(character_id)
+    for face, asset in transform_faces:
+        output = _apply_face_asset(output, face, asset) if asset is not None else _apply_face_transform(output, face, fallback_transformer)
 
     plate_boxes = _detect_plate_candidates(image_bgr) if blur_plates else []
     for plate in plate_boxes:
@@ -576,30 +507,9 @@ def apply_video_review_effects(
             faces_redacted=faces_redacted,
             plates_redacted=len(plate_boxes),
             text_regions_redacted=text_regions_redacted,
+            faces_stylized=faces_stylized,
         ),
         primary_face=primary,
         redacted_regions=tuple(redacted_regions),
         candidate_matches=matched_counts,
-    )
-
-
-def apply_character_effects(image_bgr: np.ndarray, preset_id: str | None) -> ProcessingResult:
-    faces = [detection.box for detection in detect_face_details(image_bgr)]
-    primary = _largest_face(faces)
-    transformer = _style_transformer(preset_id)
-
-    if primary is None:
-        output = transformer(image_bgr)
-    else:
-        output = _apply_face_transform(image_bgr, primary, transformer)
-
-    return ProcessingResult(
-        image_bgr=output,
-        detections=ProcessingDetections(
-            faces_total=len(faces),
-            faces_redacted=0,
-            plates_redacted=0,
-            text_regions_redacted=0,
-        ),
-        primary_face=primary,
     )

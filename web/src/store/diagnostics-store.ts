@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from "react";
 
 import type { RuntimeDiagnosticsSnapshot } from "../services/diagnostics-api";
-import type { DetectionCounts, RealtimeMode } from "../services/realtime-api";
 
 export type DiagnosticsTone = "neutral" | "success" | "warning" | "danger";
 
@@ -16,10 +15,8 @@ export type DiagnosticsStoreState = {
   gpuStatus: string;
   runtimeStatus: string;
   queueDepth: number | null;
-  currentMode: RealtimeMode;
   currentPreset: string;
   recentLatencyMs: number | null;
-  recentDetectionCount: number | null;
   lastError: string | null;
   lastRequestId: string | null;
   lastUpdatedAt: string | null;
@@ -31,10 +28,8 @@ const INITIAL_STATE: DiagnosticsStoreState = {
   gpuStatus: "unknown",
   runtimeStatus: "unknown",
   queueDepth: null,
-  currentMode: "privacy",
-  currentPreset: "프라이버시 기본",
+  currentPreset: "디퓨전 대체",
   recentLatencyMs: null,
-  recentDetectionCount: null,
   lastError: null,
   lastRequestId: null,
   lastUpdatedAt: null,
@@ -51,14 +46,6 @@ function emit() {
 function patchState(patch: Partial<DiagnosticsStoreState>) {
   state = { ...state, ...patch };
   emit();
-}
-
-function countDetections(detections: DetectionCounts | null) {
-  if (!detections) {
-    return null;
-  }
-
-  return detections.facesRedacted + detections.platesRedacted + detections.textRegionsRedacted;
 }
 
 function toneFromStatus(status: string): DiagnosticsTone {
@@ -125,17 +112,6 @@ export const diagnosticsStore = {
       rawRuntime: snapshot.raw,
     });
   },
-  setSessionContext(input: { mode: RealtimeMode; presetLabel?: string | null }) {
-    patchState({ currentMode: input.mode, currentPreset: input.presetLabel?.trim() || state.currentPreset });
-  },
-  setFrameMetrics(input: { detections: DetectionCounts; latencyMs: number | null; requestId: string | null }) {
-    patchState({
-      recentDetectionCount: countDetections(input.detections),
-      recentLatencyMs: input.latencyMs,
-      lastRequestId: input.requestId,
-      lastUpdatedAt: new Date().toISOString(),
-    });
-  },
   setError(message: string | null) {
     patchState({ lastError: message, lastUpdatedAt: new Date().toISOString() });
   },
@@ -152,9 +128,9 @@ export function selectDiagnosticsItems(snapshot: DiagnosticsStoreState): Diagnos
       tone: snapshot.recentLatencyMs !== null && snapshot.recentLatencyMs > 180 ? "warning" : "neutral",
     },
     {
-      label: "검출",
-      value: snapshot.recentDetectionCount === null ? "-" : `리댁션 ${snapshot.recentDetectionCount}개`,
-      tone: snapshot.recentDetectionCount ? "warning" : "neutral",
+      label: "대기열",
+      value: snapshot.queueDepth === null ? "-" : `${snapshot.queueDepth}개`,
+      tone: snapshot.queueDepth && snapshot.queueDepth > 0 ? "warning" : "neutral",
     },
   ];
 }

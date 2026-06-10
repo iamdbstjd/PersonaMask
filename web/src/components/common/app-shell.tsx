@@ -7,8 +7,6 @@ import { DiagnosticsRail, type DiagnosticItem } from "../diagnostics/diagnostics
 
 const NAV_ITEMS = [
   { href: "/", label: "개요", routeKey: "overview" },
-  { href: "/character", label: "캐릭터", routeKey: "character" },
-  { href: "/privacy", label: "프라이버시", routeKey: "privacy" },
   { href: "/video", label: "영상 리뷰", routeKey: "video" },
   { href: "/settings", label: "설정", routeKey: "settings" },
 ] as const;
@@ -132,8 +130,8 @@ export function AppShell({
 
       <footer className="app-footer">
         <span>© 2026 PersonaMask 콘솔 · 보안 등급 영상 처리 인터페이스</span>
-        <a href="/privacy">개인정보 처리방침</a>
-        <a href="/settings">이용약관</a>
+        <a href="/video">영상 리뷰</a>
+        <a href="/settings">설정</a>
       </footer>
     </div>
   );

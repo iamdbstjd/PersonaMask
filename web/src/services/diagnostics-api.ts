@@ -15,7 +15,7 @@ export type PresetItem = {
   label: string;
   mode: "character";
   thumbnailUrl: string;
-  supportsRealtime: boolean;
+  engine: string;
 };
 
 type DiagnosticsResponseData = Record<string, unknown>;
@@ -25,7 +25,7 @@ type PresetItemWire = {
   label: string;
   mode: "character";
   thumbnail_url: string;
-  supports_realtime: boolean;
+  engine: string;
 };
 
 type PresetsResponseData = {
@@ -49,9 +49,9 @@ function readStatus(record: Record<string, unknown>, keys: string[], fallback: s
 
 function formatPresetLabel(label: string): string {
   const labels: Record<string, string> = {
-    "Spider Mask": "스파이더 마스크",
-    "Bat Mask": "배트 마스크",
-    "Anime Mask": "애니메이션 마스크",
+    "Animated Portrait": "애니메이션 초상",
+    "Clay Avatar": "클레이 아바타",
+    "Comic Ink": "코믹 잉크",
   };
 
   return labels[label] ?? label;
@@ -94,6 +94,6 @@ export async function fetchPresets(): Promise<PresetItem[]> {
     label: formatPresetLabel(item.label),
     mode: item.mode,
     thumbnailUrl: item.thumbnail_url,
-    supportsRealtime: item.supports_realtime,
+    engine: item.engine,
   }));
 }

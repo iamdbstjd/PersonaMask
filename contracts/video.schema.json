@@ -39,8 +39,7 @@
       "required": [
         "blur_faces",
         "blur_plates",
-        "blur_text",
-        "allowlist_enabled"
+        "blur_text"
       ],
       "properties": {
         "blur_faces": {
@@ -50,9 +49,6 @@
           "type": "boolean"
         },
         "blur_text": {
-          "type": "boolean"
-        },
-        "allowlist_enabled": {
           "type": "boolean"
         }
       }
@@ -380,6 +376,10 @@
         },
         "suspect_frame_count": {
           "type": "integer"
+        },
+        "character_style": {
+          "type": "object",
+          "additionalProperties": true
         }
       }
     },

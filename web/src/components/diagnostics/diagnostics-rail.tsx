@@ -25,9 +25,9 @@ export function DiagnosticsRail({
   return (
     <div className="aside-stack">
       <PanelCard
-        kicker="실시간 상태"
+        kicker="운영 상태"
         title="런타임 스냅샷"
-        description="핵심 운영 상태만 남겨서 사이드 패널을 더 차분하게 정리했습니다."
+        description="영상 처리에 필요한 API, GPU, 대기열 상태만 정리했습니다."
       >
         <div className="stack-sm">
           {items.map((item) => (

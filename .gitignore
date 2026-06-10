@@ -39,6 +39,14 @@ models/enhancers/
 data/
 test_video.mp4
 
+# Local presentation drafts and demo media
+/*.ppt
+/*.pptx
+/*.key
+/*.mp4
+/showcase_*.jpg
+/초상권 침해 뉴스*.png
+
 # Frontend build artifacts
 web/node_modules/
 web/.next/

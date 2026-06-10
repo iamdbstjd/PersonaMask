@@ -40,7 +40,6 @@ class VideoJobTests(ApiTestCase):
         config = service._parse_config(None)
 
         self.assertEqual(config.mode, "blur")
-        self.assertFalse(config.privacy_options.allowlist_enabled)
         self.assertFalse(config.output_options.keep_audio)
 
     def test_create_job_rejects_non_video_media_type(self) -> None:
@@ -79,7 +78,7 @@ class VideoJobTests(ApiTestCase):
                 "config": json.dumps(
                     {
                         "mode": "character",
-                        "character_id": "spider",
+                        "character_id": "anime_portrait",
                         "analysis_id": analysis["analysis_id"],
                         "candidate_access_token": analysis["access_token"],
                         "candidate_actions": {"face_0001": "character", "face_0002": "blur"},
@@ -87,7 +86,6 @@ class VideoJobTests(ApiTestCase):
                             "blur_faces": True,
                             "blur_plates": True,
                             "blur_text": False,
-                            "allowlist_enabled": True,
                         },
                         "output_options": {"container": "mp4", "video_codec": "mp4v", "keep_audio": True},
                     }
@@ -125,6 +123,7 @@ class VideoJobTests(ApiTestCase):
         self.assertEqual(result["qa_summary"]["processed_frames"], 3)
         self.assertIn("faces_total", result["qa_summary"]["detection_totals"])
         self.assertIn("candidate_enforcement", result["qa_summary"])
+        self.assertIn("character_style", result["qa_summary"])
         self.assertEqual(job_repository.get_queue_depth(), 0)
 
         download_response = self.client.get(f"/api/v1/videos/jobs/{job_id}/result", headers={"X-Access-Token": access_token})
@@ -146,6 +145,7 @@ class VideoJobTests(ApiTestCase):
         self.assertEqual(qa_payload["analysis_id"], analysis["analysis_id"])
         self.assertEqual(qa_payload["candidate_actions"]["face_0001"], "character")
         self.assertIn("candidate_enforcement", qa_payload)
+        self.assertEqual(qa_payload["character_style"]["generated_count"], 1)
         self.assertIn("detection_totals", qa_payload)
         self.assertIn("contact_sheet", qa_payload["artifacts"])
 
@@ -303,3 +303,13 @@ class VideoJobTests(ApiTestCase):
         image_response = self.client.get(candidate["image_url"], headers={"X-Access-Token": payload["data"]["access_token"]})
         self.assertEqual(image_response.status_code, 200)
         self.assertTrue(image_response.content.startswith(b"\xff\xd8"))
+
+    def test_video_candidate_analysis_caps_review_candidates_at_five(self) -> None:
+        with patch("app.services.video_job_service.extract_video_face_candidates", return_value=[]) as extract_candidates:
+            response = self.client.post(
+                "/api/v1/videos/candidates",
+                files={"file": ("candidate-source.mp4", self.make_video_bytes(), "video/mp4")},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(extract_candidates.call_args.kwargs["max_candidates"], 5)

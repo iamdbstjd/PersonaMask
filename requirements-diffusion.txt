@@ -1,0 +1,8 @@
+# Optional diffusion runtime for uploaded-video character redaction.
+# Install this in the same Python environment when PERSONAMASK_DIFFUSION_ENABLED=1
+# should use an actual img2img model instead of the built-in OpenCV fallback.
+diffusers>=0.31,<1.0
+transformers>=4.44,<5.0
+accelerate>=0.34,<1.0
+safetensors>=0.4,<1.0
+torch>=2.3,<3.0

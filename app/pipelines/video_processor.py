@@ -10,6 +10,8 @@ from typing import Sequence
 import cv2
 import numpy as np
 
+from app.core.config import Settings
+from app.pipelines.character_stylizer import build_character_style_assets
 from app.pipelines.frame_processor import apply_video_review_effects
 from app.pipelines.frame_processor import CandidateReference
 from app.pipelines.frame_processor import FaceBox
@@ -30,6 +32,7 @@ class VideoProcessingSummary:
     average_blur_reduction_pct: float | None
     suspect_frames: list[dict[str, Any]]
     candidate_enforcement: dict[str, dict[str, Any]]
+    character_style: dict[str, Any]
 
 
 def _open_capture(path: Path) -> cv2.VideoCapture:
@@ -56,10 +59,10 @@ def process_video_privacy(
     *,
     upload_path: Path,
     output_path: Path,
+    settings: Settings,
     blur_faces: bool,
     blur_plates: bool,
     blur_text: bool,
-    allowlist_enabled: bool,
     mode: str = "video_privacy",
     character_id: str | None = None,
     analysis_id: str | None = None,
@@ -68,6 +71,12 @@ def process_video_privacy(
 ) -> VideoProcessingSummary:
     capture = _open_capture(upload_path)
     candidate_references = tuple(candidate_references or ())
+    character_styles = build_character_style_assets(
+        references=candidate_references,
+        output_dir=output_path.parent / "character-styles",
+        settings=settings,
+        preset_id=character_id,
+    )
     candidate_matcher = (
         "insightface_arcface_cosine"
         if any(reference.embedding is not None for reference in candidate_references)
@@ -99,6 +108,7 @@ def process_video_privacy(
     detection_totals = {
         "faces_total": 0,
         "faces_redacted": 0,
+        "faces_stylized": 0,
         "plates_redacted": 0,
         "text_regions_redacted": 0,
     }
@@ -117,15 +127,16 @@ def process_video_privacy(
                 blur_faces=blur_faces,
                 blur_plates=blur_plates,
                 blur_text=blur_text,
-                allowlist_enabled=allowlist_enabled,
                 character_id=character_id,
                 candidate_references=candidate_references,
+                character_style_assets=character_styles.assets,
             )
             writer.write(result.image_bgr)
             frame_index = processed_frames
             processed_frames += 1
             detection_totals["faces_total"] += result.detections.faces_total
             detection_totals["faces_redacted"] += result.detections.faces_redacted
+            detection_totals["faces_stylized"] += result.detections.faces_stylized
             detection_totals["plates_redacted"] += result.detections.plates_redacted
             detection_totals["text_regions_redacted"] += result.detections.text_regions_redacted
             for candidate_id, count in result.candidate_matches.items():
@@ -137,7 +148,8 @@ def process_video_privacy(
 
             suspect_reasons = _suspect_reasons(
                 mode=mode,
-                allowlist_enabled=allowlist_enabled,
+                blur_faces=blur_faces,
+                has_candidate_actions=bool(candidate_actions),
                 faces_total=result.detections.faces_total,
                 faces_redacted=result.detections.faces_redacted,
                 primary_face=bool(result.primary_face),
@@ -178,6 +190,7 @@ def process_video_privacy(
         "character_id": character_id,
         "analysis_id": analysis_id,
         "candidate_actions": candidate_actions or {},
+        "character_style": character_styles.report,
         "candidate_enforcement": {
             candidate_id: {
                 "action": action,
@@ -210,6 +223,7 @@ def process_video_privacy(
         average_blur_reduction_pct=average_blur_reduction_pct,
         suspect_frames=suspect_frames[:50],
         candidate_enforcement=report_payload["candidate_enforcement"],
+        character_style=character_styles.report,
     )
 
 
@@ -249,17 +263,17 @@ def _sharpness(frame: np.ndarray) -> float:
 def _suspect_reasons(
     *,
     mode: str,
-    allowlist_enabled: bool,
+    blur_faces: bool,
+    has_candidate_actions: bool,
     faces_total: int,
     faces_redacted: int,
     primary_face: bool,
     blur_reduction_pct: float | None,
 ) -> list[str]:
     review_mode = "blur" if mode == "video_privacy" else mode
-    allowed_faces = 1 if allowlist_enabled and primary_face and review_mode in {"preserve", "character"} else 0
-    expected_redactions = max(0, faces_total - allowed_faces)
+    expected_redactions = faces_total if blur_faces and not has_candidate_actions and review_mode == "blur" else 0
     reasons: list[str] = []
-    if faces_redacted < expected_redactions:
+    if primary_face and faces_redacted < expected_redactions:
         reasons.append("expected_face_redaction_count_not_met")
     if blur_reduction_pct is not None and blur_reduction_pct < 25.0 and faces_redacted > 0:
         reasons.append("low_blur_strength")
@@ -293,6 +307,7 @@ def _markdown_report(payload: dict[str, Any]) -> str:
     totals = payload["detection_totals"]
     suspects = payload["suspect_frames"]
     candidate_enforcement = payload.get("candidate_enforcement", {})
+    character_style = payload.get("character_style", {})
     lines = [
         "# Redaction QA Report",
         "",
@@ -305,8 +320,16 @@ def _markdown_report(payload: dict[str, Any]) -> str:
         f"- Faces redacted: {totals['faces_redacted']}",
         f"- Plates redacted: {totals['plates_redacted']}",
         f"- Text regions redacted: {totals['text_regions_redacted']}",
+        f"- Character styled faces: {totals.get('faces_stylized', 0)}",
         f"- Average blur reduction pct: {payload['average_blur_reduction_pct']}",
         f"- Suspect frame count: {len(suspects)}",
+        "",
+        "## Character Style",
+        "",
+        f"- Enabled: {character_style.get('enabled', False)}",
+        f"- Preset: {character_style.get('preset_id')}",
+        f"- Model: {character_style.get('model')}",
+        f"- Generated assets: {character_style.get('generated_count', 0)}",
         "",
         "## Candidate Enforcement",
         "",

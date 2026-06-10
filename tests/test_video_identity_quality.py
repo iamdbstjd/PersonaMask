@@ -58,7 +58,6 @@ class TestVideoIdentityQuality(unittest.TestCase):
                         blur_faces=True,
                         blur_plates=False,
                         blur_text=False,
-                        allowlist_enabled=False,
                         candidate_references=references,
                     )
                     sampled_frames += 1

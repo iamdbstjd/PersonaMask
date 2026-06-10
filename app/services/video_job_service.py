@@ -34,6 +34,7 @@ from app.services.video_candidate_service import VideoFaceCandidate, extract_vid
 class VideoJobService:
     SUPPORTED_EXTENSIONS = {".mp4", ".mov", ".webm", ".mkv", ".avi"}
     MAX_UPLOAD_BYTES = 1024 * 1024 * 1024  # 1GB safety cap for local skeleton runtime
+    MAX_REVIEW_CANDIDATES = 5
     SAFE_ID = re.compile(r"^[A-Za-z0-9_-]+$")
     _processing_lock = threading.Lock()
     _processing_jobs: set[str] = set()
@@ -194,7 +195,7 @@ class VideoJobService:
             _, _, width, height = probe_video(upload_path)
             if width <= 0 or height <= 0:
                 raise VideoProcessingError("unable to infer video dimensions")
-            candidates = extract_video_face_candidates(upload_path, faces_dir)
+            candidates = extract_video_face_candidates(upload_path, faces_dir, max_candidates=self.MAX_REVIEW_CANDIDATES)
         except HTTPException:
             shutil.rmtree(analysis_dir, ignore_errors=True)
             raise
@@ -389,11 +390,11 @@ class VideoJobService:
         summary = process_video_privacy(
             upload_path=Path(record.upload_path),
             output_path=output_path,
+            settings=self.settings,
             mode=str(config.get("mode", "video_privacy")) if isinstance(config, dict) else "video_privacy",
             blur_faces=bool(privacy.get("blur_faces", True)),
             blur_plates=bool(privacy.get("blur_plates", True)),
             blur_text=bool(privacy.get("blur_text", True)),
-            allowlist_enabled=bool(privacy.get("allowlist_enabled", False)),
             character_id=str(config.get("character_id")) if isinstance(config, dict) and config.get("character_id") else None,
             analysis_id=str(config.get("analysis_id")) if isinstance(config, dict) and config.get("analysis_id") else None,
             candidate_actions=candidate_actions if isinstance(candidate_actions, dict) else {},
@@ -413,6 +414,7 @@ class VideoJobService:
                 "average_blur_reduction_pct": summary.average_blur_reduction_pct,
                 "suspect_frame_count": len(summary.suspect_frames),
                 "candidate_enforcement": summary.candidate_enforcement,
+                "character_style": summary.character_style,
             },
         }
         job_repository.complete(

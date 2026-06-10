@@ -58,6 +58,7 @@ export type UseVideoJobResult = {
   analyzeCandidates: () => Promise<void>;
   updateCandidateAction: (candidateId: string, action: CandidateAction) => void;
   updatePrivacyOption: (option: keyof PrivacyOptions, value: boolean) => void;
+  updateCharacterPreset: (presetId: string) => void;
   updateMode: (mode: VideoJobProcessingMode) => void;
   updateKeepAudio: (value: boolean) => void;
   resetConfig: () => void;
@@ -206,12 +207,6 @@ export function useVideoJob({
         candidate_access_token: analysis.access_token,
         candidate_actions: defaultActions,
         mode: deriveModeFromActions(defaultActions, previous.mode),
-        privacy_options: {
-          ...previous.privacy_options,
-          allowlist_enabled: Object.values(defaultActions).some(
-            (value) => value === "preserve" || value === "character" || value === "track",
-          ),
-        },
       }));
     } catch (error) {
       setLastError(toErrorMessage(error));
@@ -227,10 +222,6 @@ export function useVideoJob({
         ...current,
         candidate_actions: next,
         mode: deriveModeFromActions(next, current.mode),
-        privacy_options: {
-          ...current.privacy_options,
-          allowlist_enabled: Object.values(next).some((value) => value === "preserve" || value === "character" || value === "track"),
-        },
       }));
       return next;
     });
@@ -246,14 +237,17 @@ export function useVideoJob({
     }));
   }, []);
 
+  const updateCharacterPreset = useCallback((presetId: string) => {
+    setConfig((previous) => ({
+      ...previous,
+      character_id: presetId,
+    }));
+  }, []);
+
   const updateMode = useCallback((mode: VideoJobProcessingMode) => {
     setConfig((previous) => ({
       ...previous,
       mode,
-      privacy_options: {
-        ...previous.privacy_options,
-        allowlist_enabled: mode !== "blur",
-      },
     }));
   }, []);
 
@@ -274,12 +268,7 @@ export function useVideoJob({
       candidate_access_token: candidateAnalysis?.access_token ?? null,
       candidate_actions: candidateActions,
       mode: deriveModeFromActions(candidateActions, initialConfig.mode),
-      privacy_options: {
-        ...initialConfig.privacy_options,
-        allowlist_enabled: Object.values(candidateActions).some(
-          (value) => value === "preserve" || value === "character" || value === "track",
-        ),
-      },
+      privacy_options: initialConfig.privacy_options,
     });
   }, [candidateActions, candidateAnalysis?.access_token, candidateAnalysis?.analysis_id, initialConfig]);
 
@@ -367,6 +356,7 @@ export function useVideoJob({
     analyzeCandidates,
     updateCandidateAction,
     updatePrivacyOption,
+    updateCharacterPreset,
     updateMode,
     updateKeepAudio,
     resetConfig,

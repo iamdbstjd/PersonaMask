@@ -36,7 +36,7 @@ def extract_video_face_candidates(
     output_dir: Path,
     *,
     max_frames: int = 90,
-    max_candidates: int = 12,
+    max_candidates: int = 5,
 ) -> list[VideoFaceCandidate]:
     output_dir.mkdir(parents=True, exist_ok=True)
     capture = cv2.VideoCapture(str(video_path))
