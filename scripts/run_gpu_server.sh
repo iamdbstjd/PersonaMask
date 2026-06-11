@@ -5,7 +5,7 @@ CONDA_ENV_NAME="${CONDA_ENV_NAME:-bys}"
 CONDA_PREFIX="${PERSONAMASK_CONDA_PREFIX:-/home/bys0626/miniconda3/envs/${CONDA_ENV_NAME}}"
 PYTHON_BIN="${PYTHON_BIN:-${CONDA_PREFIX}/bin/python}"
 HOST="${HOST:-127.0.0.1}"
-PORT="${PORT:-8001}"
+PORT="${PORT:-8013}"
 
 if [[ ! -x "${PYTHON_BIN}" ]]; then
   echo "Python executable not found: ${PYTHON_BIN}" >&2

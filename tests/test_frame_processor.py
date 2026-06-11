@@ -11,7 +11,9 @@ from app.pipelines.frame_processor import (
     FaceBox,
     FaceDetection,
     _crop_face_with_padding,
+    _detect_faces_yolo,
     apply_video_review_effects,
+    detect_face_details,
 )
 
 
@@ -24,7 +26,81 @@ def _detections(*faces: FaceBox) -> list[FaceDetection]:
     return [FaceDetection(box=face) for face in faces]
 
 
+class _DummyYoloBox:
+    def __init__(self, xyxy: list[float], cls: int, conf: float) -> None:
+        self.xyxy = np.asarray([xyxy], dtype=np.float32)
+        self.cls = np.asarray([cls], dtype=np.float32)
+        self.conf = np.asarray([conf], dtype=np.float32)
+
+
+class _DummyYoloResult:
+    def __init__(self, boxes: list[_DummyYoloBox]) -> None:
+        self.boxes = boxes
+
+
+class _DummyYoloModel:
+    names = {0: "face", 1: "person"}
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def predict(self, image: np.ndarray, *, verbose: bool, conf: float) -> list[_DummyYoloResult]:
+        self.calls += 1
+        return [
+            _DummyYoloResult(
+                [
+                    _DummyYoloBox([12.2, 16.4, 58.8, 72.1], cls=0, conf=0.91),
+                    _DummyYoloBox([5.0, 5.0, 130.0, 150.0], cls=1, conf=0.88),
+                ]
+            )
+        ]
+
+
 class FrameProcessorTests(unittest.TestCase):
+    def test_yolo_face_detector_maps_face_boxes_when_configured(self) -> None:
+        image = _random_image()
+        model = _DummyYoloModel()
+
+        with patch.dict("os.environ", {"PERSONAMASK_YOLO_FACE_CLASSES": "face"}):
+            detections = _detect_faces_yolo(image, model)
+
+        self.assertEqual(model.calls, 1)
+        self.assertEqual(len(detections), 1)
+        self.assertEqual(detections[0].detector, "yolo_face")
+        self.assertAlmostEqual(detections[0].confidence, 0.91, places=2)
+        self.assertEqual(detections[0].box.as_list(), [12, 16, 59, 72])
+
+    def test_detect_face_details_prefers_yolo_when_available(self) -> None:
+        image = _random_image()
+        model = _DummyYoloModel()
+
+        with patch("app.pipelines.frame_processor._get_yolo_model", return_value=model), patch.dict(
+            "os.environ", {"PERSONAMASK_YOLO_FACE_CLASSES": "face"}
+        ):
+            detections = detect_face_details(image)
+
+        self.assertEqual(len(detections), 1)
+        self.assertEqual(detections[0].detector, "yolo_face")
+
+    def test_yolo_mode_without_model_path_falls_back_to_opencv(self) -> None:
+        image = _random_image()
+        fallback_face = FaceBox(x1=20, y1=24, x2=80, y2=96)
+
+        with patch.dict(
+            "os.environ",
+            {
+                "PERSONAMASK_FACE_DETECTOR": "yolo",
+                "PERSONAMASK_YOLO_FACE_MODEL": "",
+            },
+        ), patch("app.pipelines.frame_processor._get_insightface_app", return_value=None), patch(
+            "app.pipelines.frame_processor._detect_faces_opencv", return_value=[fallback_face]
+        ):
+            detections = detect_face_details(image)
+
+        self.assertEqual(len(detections), 1)
+        self.assertEqual(detections[0].detector, "opencv_haar")
+        self.assertEqual(detections[0].box, fallback_face)
+
     def test_video_review_modes_blur_or_preserve_candidate_face(self) -> None:
         image = _random_image()
         primary_face = FaceBox(x1=58, y1=42, x2=126, y2=124)

@@ -6,6 +6,7 @@ import {
   DEFAULT_VIDEO_JOB_CONFIG,
   VideoApiError,
   analyzeVideoCandidates,
+  type AllowedFaceReference,
   type CandidateAction,
   type FetchLike,
   type PrivacyOptions,
@@ -57,6 +58,7 @@ export type UseVideoJobResult = {
   setDragActive: (active: boolean) => void;
   analyzeCandidates: () => Promise<void>;
   updateCandidateAction: (candidateId: string, action: CandidateAction) => void;
+  updateAllowedFaceReferences: (references: AllowedFaceReference[]) => void;
   updatePrivacyOption: (option: keyof PrivacyOptions, value: boolean) => void;
   updateCharacterPreset: (presetId: string) => void;
   updateMode: (mode: VideoJobProcessingMode) => void;
@@ -227,6 +229,13 @@ export function useVideoJob({
     });
   }, []);
 
+  const updateAllowedFaceReferences = useCallback((references: AllowedFaceReference[]) => {
+    setConfig((previous) => ({
+      ...previous,
+      allowed_face_references: references,
+    }));
+  }, []);
+
   const updatePrivacyOption = useCallback((option: keyof PrivacyOptions, value: boolean) => {
     setConfig((previous) => ({
       ...previous,
@@ -267,10 +276,11 @@ export function useVideoJob({
       analysis_id: candidateAnalysis?.analysis_id ?? null,
       candidate_access_token: candidateAnalysis?.access_token ?? null,
       candidate_actions: candidateActions,
+      allowed_face_references: config.allowed_face_references ?? [],
       mode: deriveModeFromActions(candidateActions, initialConfig.mode),
       privacy_options: initialConfig.privacy_options,
     });
-  }, [candidateActions, candidateAnalysis?.access_token, candidateAnalysis?.analysis_id, initialConfig]);
+  }, [candidateActions, candidateAnalysis?.access_token, candidateAnalysis?.analysis_id, config.allowed_face_references, initialConfig]);
 
   const submit = useCallback(async () => {
     if (!selectedFile) {
@@ -355,6 +365,7 @@ export function useVideoJob({
     setDragActive,
     analyzeCandidates,
     updateCandidateAction,
+    updateAllowedFaceReferences,
     updatePrivacyOption,
     updateCharacterPreset,
     updateMode,

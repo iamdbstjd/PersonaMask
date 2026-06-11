@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 from json import JSONDecodeError, loads
 from pathlib import Path
@@ -7,7 +9,7 @@ import re
 import secrets
 import shutil
 import threading
-from typing import BinaryIO
+from typing import Any, BinaryIO
 from uuid import uuid4
 
 import cv2
@@ -16,7 +18,7 @@ from fastapi.responses import FileResponse
 from pydantic import ValidationError
 
 from app.core.config import Settings
-from app.pipelines.frame_processor import CandidateReference
+from app.pipelines.frame_processor import CandidateReference, decode_image_bytes
 from app.pipelines.video_processor import VideoProcessingError, probe_video, process_video_privacy
 from app.repositories.job_repository import JobRecord, job_repository
 from app.schemas.videos import (
@@ -34,7 +36,9 @@ from app.services.video_candidate_service import VideoFaceCandidate, extract_vid
 class VideoJobService:
     SUPPORTED_EXTENSIONS = {".mp4", ".mov", ".webm", ".mkv", ".avi"}
     MAX_UPLOAD_BYTES = 1024 * 1024 * 1024  # 1GB safety cap for local skeleton runtime
+    MAX_REFERENCE_IMAGE_BYTES = 3 * 1024 * 1024
     MAX_REVIEW_CANDIDATES = 5
+    ALLOWED_FACE_SLOTS = {"front", "left45", "right45", "leftSide", "rightSide"}
     SAFE_ID = re.compile(r"^[A-Za-z0-9_-]+$")
     _processing_lock = threading.Lock()
     _processing_jobs: set[str] = set()
@@ -140,6 +144,14 @@ class VideoJobService:
     async def create_job(self, *, file: UploadFile, raw_config: str | None) -> VideoJobCreateData:
         config = self._parse_config(raw_config)
         self._validate_candidate_analysis_token(config.analysis_id, config.candidate_access_token)
+        config_payload = config.model_dump()
+        try:
+            allowed_face_images = self._decode_allowed_face_reference_items(config_payload)
+        except VideoProcessingError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "INVALID_ALLOWED_FACE_REFERENCE", "message": str(exc)},
+            ) from exc
         safe_filename = self._sanitize_filename(file.filename, "upload.mp4")
         self._validate_video_upload(file, safe_filename)
 
@@ -161,10 +173,22 @@ class VideoJobService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={"code": "INVALID_VIDEO_FILE", "message": "unable to infer video dimensions"},
             )
+        try:
+            persisted_config = self._build_persisted_config(
+                job_id=job_id,
+                config_payload=config_payload,
+                allowed_face_images=allowed_face_images,
+            )
+        except VideoProcessingError as exc:
+            shutil.rmtree(upload_path.parent, ignore_errors=True)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "INVALID_ALLOWED_FACE_REFERENCE", "message": str(exc)},
+            ) from exc
 
         record = job_repository.create(
             job_id=job_id,
-            config=config.model_dump(),
+            config=persisted_config,
             upload_path=str(upload_path),
             filename=safe_filename,
             content_type=file.content_type,
@@ -370,6 +394,116 @@ class VideoJobService:
             references.append(CandidateReference(candidate_id=candidate_id, action=str(action), image_bgr=image_bgr, embedding=embedding))
         return references
 
+    def _decode_reference_image_data(self, image_data: str):
+        if "," in image_data:
+            prefix, image_data = image_data.split(",", 1)
+            if not prefix.lower().startswith("data:image/") or ";base64" not in prefix.lower():
+                raise VideoProcessingError("allowed face reference must be a base64 image data URL")
+        try:
+            payload = base64.b64decode(image_data, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise VideoProcessingError("allowed face reference image is not valid base64") from exc
+        if not payload:
+            raise VideoProcessingError("allowed face reference image is empty")
+        if len(payload) > self.MAX_REFERENCE_IMAGE_BYTES:
+            raise VideoProcessingError(f"allowed face reference image must be <= {self.MAX_REFERENCE_IMAGE_BYTES} bytes")
+        try:
+            return decode_image_bytes(payload)
+        except ValueError as exc:
+            raise VideoProcessingError("allowed face reference image is not decodable") from exc
+
+    def _decode_allowed_face_reference_items(self, config: dict[str, object]) -> list[tuple[str, Any]]:
+        raw_references = config.get("allowed_face_references", [])
+        if raw_references in (None, []):
+            return []
+        if not isinstance(raw_references, list):
+            raise VideoProcessingError("allowed_face_references must be a list")
+
+        references: list[tuple[str, Any]] = []
+        seen_slots: set[str] = set()
+        for item in raw_references[: self.MAX_REVIEW_CANDIDATES]:
+            if not isinstance(item, dict):
+                raise VideoProcessingError("allowed face reference must be an object")
+            slot = item.get("slot")
+            image_data = item.get("image_data")
+            if not isinstance(slot, str) or slot not in self.ALLOWED_FACE_SLOTS:
+                raise VideoProcessingError("allowed face reference slot is invalid")
+            if slot in seen_slots:
+                continue
+            if not isinstance(image_data, str):
+                raise VideoProcessingError("allowed face reference image_data is required")
+            references.append((slot, self._decode_reference_image_data(image_data)))
+            seen_slots.add(slot)
+        return references
+
+    def _load_allowed_face_reference_paths(self, config: dict[str, object]) -> list[tuple[str, Any]]:
+        raw_references = config.get("allowed_face_reference_paths", [])
+        if raw_references in (None, []):
+            return []
+        if not isinstance(raw_references, list):
+            raise VideoProcessingError("allowed_face_reference_paths must be a list")
+
+        references: list[tuple[str, Any]] = []
+        seen_slots: set[str] = set()
+        for item in raw_references[: self.MAX_REVIEW_CANDIDATES]:
+            if not isinstance(item, dict):
+                raise VideoProcessingError("allowed face reference path must be an object")
+            slot = item.get("slot")
+            path_text = item.get("path")
+            if not isinstance(slot, str) or slot not in self.ALLOWED_FACE_SLOTS:
+                raise VideoProcessingError("allowed face reference slot is invalid")
+            if slot in seen_slots:
+                continue
+            if not isinstance(path_text, str):
+                raise VideoProcessingError("allowed face reference path is required")
+            reference_path = Path(path_text).resolve()
+            if not reference_path.is_relative_to(self.upload_dir):
+                raise VideoProcessingError("allowed face reference path is outside the upload directory")
+            image_bgr = cv2.imread(str(reference_path))
+            if image_bgr is None:
+                raise VideoProcessingError("allowed face reference image is not readable")
+            references.append((slot, image_bgr))
+            seen_slots.add(slot)
+        return references
+
+    def _load_allowed_face_references(self, config: dict[str, object]) -> list[CandidateReference]:
+        image_items = [
+            *self._decode_allowed_face_reference_items(config),
+            *self._load_allowed_face_reference_paths(config),
+        ]
+        return [
+            CandidateReference(
+                candidate_id="allowed_face",
+                action="preserve",
+                image_bgr=image_bgr,
+            )
+            for _, image_bgr in image_items
+        ]
+
+    def _build_persisted_config(
+        self,
+        *,
+        job_id: str,
+        config_payload: dict[str, object],
+        allowed_face_images: list[tuple[str, Any]],
+    ) -> dict[str, object]:
+        persisted_config = dict(config_payload)
+        if not allowed_face_images:
+            return persisted_config
+
+        reference_dir = self.upload_dir / job_id / "allowed-faces"
+        reference_dir.mkdir(parents=True, exist_ok=True)
+        persisted_paths: list[dict[str, str]] = []
+        for slot, image_bgr in allowed_face_images:
+            reference_path = reference_dir / f"{slot}.jpg"
+            if not cv2.imwrite(str(reference_path), image_bgr):
+                raise VideoProcessingError("allowed face reference image could not be stored")
+            persisted_paths.append({"slot": slot, "path": str(reference_path)})
+
+        persisted_config["allowed_face_references"] = []
+        persisted_config["allowed_face_reference_paths"] = persisted_paths
+        return persisted_config
+
     def _build_result_artifact(self, record: JobRecord) -> Path:
         output_path = self._output_path(record)
         expected_artifacts = [
@@ -387,6 +521,11 @@ class VideoJobService:
         config = record.config
         privacy = config.get("privacy_options", {}) if isinstance(config, dict) else {}
         candidate_actions = config.get("candidate_actions", {}) if isinstance(config, dict) else {}
+        candidate_references = self._load_candidate_references(config) if isinstance(config, dict) else []
+        allowed_face_references = self._load_allowed_face_references(config) if isinstance(config, dict) else []
+        report_candidate_actions = candidate_actions.copy() if isinstance(candidate_actions, dict) else {}
+        if allowed_face_references:
+            report_candidate_actions.setdefault("allowed_face", "preserve")
         summary = process_video_privacy(
             upload_path=Path(record.upload_path),
             output_path=output_path,
@@ -397,8 +536,8 @@ class VideoJobService:
             blur_text=bool(privacy.get("blur_text", True)),
             character_id=str(config.get("character_id")) if isinstance(config, dict) and config.get("character_id") else None,
             analysis_id=str(config.get("analysis_id")) if isinstance(config, dict) and config.get("analysis_id") else None,
-            candidate_actions=candidate_actions if isinstance(candidate_actions, dict) else {},
-            candidate_references=self._load_candidate_references(config) if isinstance(config, dict) else [],
+            candidate_actions=report_candidate_actions,
+            candidate_references=[*candidate_references, *allowed_face_references],
         )
         expires_at = record.result.get("expires_at") if isinstance(record.result, dict) else None
         result_payload = {

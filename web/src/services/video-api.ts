@@ -28,12 +28,18 @@ export type OutputOptions = {
   keep_audio: boolean;
 };
 
+export type AllowedFaceReference = {
+  slot: "front" | "left45" | "right45" | "leftSide" | "rightSide";
+  image_data: string;
+};
+
 export type VideoJobConfig = {
   mode: VideoJobProcessingMode;
   character_id?: string | null;
   analysis_id?: string | null;
   candidate_access_token?: string | null;
   candidate_actions?: Record<string, CandidateAction>;
+  allowed_face_references?: AllowedFaceReference[];
   privacy_options: PrivacyOptions;
   output_options: OutputOptions;
 };
@@ -134,6 +140,7 @@ export const DEFAULT_VIDEO_JOB_CONFIG: VideoJobConfig = {
   analysis_id: null,
   candidate_access_token: null,
   candidate_actions: {},
+  allowed_face_references: [],
   privacy_options: {
     blur_faces: true,
     blur_plates: false,

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 VideoJobMode = Literal["video_privacy", "blur", "preserve", "character"]
 VideoJobStatus = Literal["queued", "processing", "completed", "failed", "cancelled"]
 CandidateAction = Literal["preserve", "character", "blur", "track"]
+AllowedFaceSlot = Literal["front", "left45", "right45", "leftSide", "rightSide"]
 
 
 class VideoPrivacyOptions(BaseModel):
@@ -23,12 +24,18 @@ class VideoOutputOptions(BaseModel):
     keep_audio: bool = False
 
 
+class VideoAllowedFaceReference(BaseModel):
+    slot: AllowedFaceSlot
+    image_data: str = Field(min_length=1, max_length=6_000_000)
+
+
 class VideoJobCreateRequest(BaseModel):
     mode: VideoJobMode = "blur"
     character_id: str | None = None
     analysis_id: str | None = None
     candidate_access_token: str | None = None
     candidate_actions: dict[str, CandidateAction] = Field(default_factory=dict)
+    allowed_face_references: list[VideoAllowedFaceReference] = Field(default_factory=list, max_length=5)
     privacy_options: VideoPrivacyOptions = Field(default_factory=VideoPrivacyOptions)
     output_options: VideoOutputOptions = Field(default_factory=VideoOutputOptions)
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import Image from "next/image";
 
 import { useVideoJob } from "../../hooks/useVideoJob";
-import type { CandidateAction, VideoFaceCandidate, VideoJobResult, VideoJobUiStatus } from "../../services/video-api";
+import type { AllowedFaceReference, CandidateAction, VideoFaceCandidate, VideoJobResult, VideoJobUiStatus } from "../../services/video-api";
 
 const actionLabels: Record<CandidateAction, string> = {
   preserve: "유지",
@@ -46,6 +46,21 @@ const faceSlots = [
 
 type FaceSlotKey = (typeof faceSlots)[number]["key"];
 type CapturedFaces = Partial<Record<FaceSlotKey, string>>;
+
+function readImageFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("이미지를 읽지 못했습니다."));
+      }
+    });
+    reader.addEventListener("error", () => reject(reader.error ?? new Error("이미지를 읽지 못했습니다.")));
+    reader.readAsDataURL(file);
+  });
+}
 
 function isJobActive(status: VideoJobUiStatus): boolean {
   return status === "uploading" || status === "queued" || status === "processing";
@@ -317,15 +332,19 @@ function EnrollmentModal({
     moveToNextSlot();
   }
 
-  function handleUpload(event: ChangeEvent<HTMLInputElement>) {
+  async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
       return;
     }
-    const objectUrl = URL.createObjectURL(file);
-    onCapture(activeSlot, objectUrl);
-    moveToNextSlot();
-    event.target.value = "";
+    try {
+      onCapture(activeSlot, await readImageFileAsDataUrl(file));
+      moveToNextSlot();
+      event.target.value = "";
+      setCameraError(null);
+    } catch (error) {
+      setCameraError(error instanceof Error ? error.message : "이미지를 읽지 못했습니다.");
+    }
   }
 
   if (!open) {
@@ -401,6 +420,7 @@ function downloadQaReport(result: VideoJobResult | null, accessToken: string | n
 
 export function VideoPageScreen() {
   const controller = useVideoJob();
+  const { updateAllowedFaceReferences } = controller;
   const inputId = useId();
   const [enrollOpen, setEnrollOpen] = useState(false);
   const [capturedFaces, setCapturedFaces] = useState<CapturedFaces>({});
@@ -410,6 +430,14 @@ export function VideoPageScreen() {
   const candidateCount = controller.candidateAnalysis?.candidates.length ?? 0;
   const decisionCount = Object.keys(controller.candidateActions).length;
   const enrollmentCount = faceSlots.filter((slot) => capturedFaces[slot.key]).length;
+  const allowedFaceReferences = useMemo<AllowedFaceReference[]>(
+    () =>
+      faceSlots.flatMap((slot) => {
+        const imageData = capturedFaces[slot.key];
+        return imageData ? [{ slot: slot.key, image_data: imageData }] : [];
+      }),
+    [capturedFaces],
+  );
   const candidateEmptyTitle = controller.isAnalyzingCandidates
     ? "얼굴 분석 중"
     : controller.candidateAnalysis
@@ -437,6 +465,10 @@ export function VideoPageScreen() {
     }
     controller.selectFile(event.dataTransfer.files?.[0] ?? null);
   }
+
+  useEffect(() => {
+    updateAllowedFaceReferences(allowedFaceReferences);
+  }, [allowedFaceReferences, updateAllowedFaceReferences]);
 
   return (
     <div className="pm-dashboard">
@@ -539,7 +571,7 @@ export function VideoPageScreen() {
             <label className="pm-select-label">
               <span>포맷 / 코덱</span>
               <select value={controller.config.output_options.video_codec} disabled={jobActive} onChange={() => undefined}>
-                <option value="mp4v">MP4 / H.264</option>
+                <option value="mp4v">MP4 / mp4v</option>
               </select>
             </label>
           </section>

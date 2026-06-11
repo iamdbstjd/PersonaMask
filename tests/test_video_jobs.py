@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 import time
@@ -62,6 +63,59 @@ class VideoJobTests(ApiTestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"]["code"], "INVALID_CONFIG")
+
+    def test_allowed_face_references_load_as_preserve_reference(self) -> None:
+        service = VideoJobService(Settings(data_dir=str(self.temp_path / "data")))
+        image_data = "data:image/jpeg;base64," + base64.b64encode(self.make_image_bytes()).decode("ascii")
+
+        references = service._load_allowed_face_references(
+            {
+                "allowed_face_references": [
+                    {"slot": "front", "image_data": image_data},
+                    {"slot": "left45", "image_data": image_data},
+                ]
+            }
+        )
+
+        self.assertEqual(len(references), 2)
+        self.assertEqual({reference.candidate_id for reference in references}, {"allowed_face"})
+        self.assertTrue(all(reference.action == "preserve" for reference in references))
+        self.assertTrue(all(reference.image_bgr.size > 0 for reference in references))
+
+    def test_allowed_face_references_are_stored_as_files_not_inline_config(self) -> None:
+        service = VideoJobService(Settings(data_dir=str(self.temp_path / "data")))
+        image_data = "data:image/jpeg;base64," + base64.b64encode(self.make_image_bytes()).decode("ascii")
+        config = {"allowed_face_references": [{"slot": "front", "image_data": image_data}]}
+
+        decoded_references = service._decode_allowed_face_reference_items(config)
+        persisted_config = service._build_persisted_config(
+            job_id="job_reference_test",
+            config_payload=config,
+            allowed_face_images=decoded_references,
+        )
+
+        self.assertEqual(persisted_config["allowed_face_references"], [])
+        self.assertNotIn(image_data, json.dumps(persisted_config))
+        persisted_paths = persisted_config["allowed_face_reference_paths"]
+        self.assertEqual(len(persisted_paths), 1)
+        self.assertTrue(Path(persisted_paths[0]["path"]).exists())
+
+        references = service._load_allowed_face_references(persisted_config)
+        self.assertEqual(len(references), 1)
+        self.assertEqual(references[0].candidate_id, "allowed_face")
+        self.assertEqual(references[0].action, "preserve")
+
+    def test_allowed_face_references_reject_invalid_data_urls(self) -> None:
+        service = VideoJobService(Settings(data_dir=str(self.temp_path / "data")))
+
+        with self.assertRaisesRegex(Exception, "base64 image data URL"):
+            service._load_allowed_face_references(
+                {
+                    "allowed_face_references": [
+                        {"slot": "front", "image_data": "data:text/plain;base64,Zm9v"},
+                    ]
+                }
+            )
 
     def test_video_job_end_to_end_generates_downloadable_result(self) -> None:
         with patch("app.services.video_candidate_service.detect_face_details", return_value=self.face_detections()):

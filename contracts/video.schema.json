@@ -79,6 +79,31 @@
         }
       }
     },
+    "AllowedFaceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slot",
+        "image_data"
+      ],
+      "properties": {
+        "slot": {
+          "type": "string",
+          "enum": [
+            "front",
+            "left45",
+            "right45",
+            "leftSide",
+            "rightSide"
+          ]
+        },
+        "image_data": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 6000000
+        }
+      }
+    },
     "VideoJobConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -125,6 +150,13 @@
               "blur",
               "track"
             ]
+          }
+        },
+        "allowed_face_references": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/AllowedFaceReference"
           }
         },
         "privacy_options": {

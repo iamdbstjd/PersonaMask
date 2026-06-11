@@ -1,0 +1,3 @@
+# Optional YOLO detector path for PersonaMask.
+# Install only when PERSONAMASK_FACE_DETECTOR=yolo is used.
+ultralytics>=8.3,<9.0

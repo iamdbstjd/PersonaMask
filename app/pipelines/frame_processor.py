@@ -86,6 +86,10 @@ StyleTransformer = Callable[[np.ndarray], np.ndarray]
 
 
 _FACE_CASCADE = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+_YOLO_LOCK = Lock()
+_YOLO_MODEL: Any | None = None
+_YOLO_FAILED = False
+_YOLO_DETECTOR = "yolo_face"
 _INSIGHTFACE_LOCK = Lock()
 _INSIGHTFACE_APP: Any | None = None
 _INSIGHTFACE_FAILED = False
@@ -121,6 +125,106 @@ def _detect_faces_opencv(image_bgr: np.ndarray) -> list[FaceBox]:
         faces.append(FaceBox(x1=int(x), y1=int(y), x2=int(x + w), y2=int(y + h)))
     faces.sort(key=lambda face: face.area, reverse=True)
     return faces
+
+
+def _yolo_model_path() -> str:
+    return os.getenv("PERSONAMASK_YOLO_FACE_MODEL", "").strip()
+
+
+def _yolo_confidence_threshold() -> float:
+    raw_value = os.getenv("PERSONAMASK_YOLO_FACE_CONF", "0.35").strip()
+    try:
+        return max(0.01, min(0.99, float(raw_value)))
+    except ValueError:
+        return 0.35
+
+
+def _yolo_allowed_class_names() -> set[str]:
+    raw_value = os.getenv("PERSONAMASK_YOLO_FACE_CLASSES", "face").strip()
+    return {item.strip().lower() for item in raw_value.split(",") if item.strip()}
+
+
+def _get_yolo_model() -> Any | None:
+    global _YOLO_MODEL, _YOLO_FAILED
+    detector_mode = os.getenv("PERSONAMASK_FACE_DETECTOR", "auto").lower()
+    if detector_mode not in {"yolo", "yolo_face"}:
+        return None
+    if _YOLO_FAILED:
+        return None
+
+    model_path = _yolo_model_path()
+    if not model_path:
+        return None
+
+    with _YOLO_LOCK:
+        if _YOLO_MODEL is not None:
+            return _YOLO_MODEL
+        try:
+            from ultralytics import YOLO
+
+            _YOLO_MODEL = YOLO(model_path)
+        except Exception:
+            _YOLO_FAILED = True
+            return None
+        return _YOLO_MODEL
+
+
+def _yolo_class_name(model: Any, class_id: int | None) -> str | None:
+    if class_id is None:
+        return None
+    names = getattr(model, "names", None)
+    if isinstance(names, Mapping):
+        value = names.get(class_id)
+    elif isinstance(names, Sequence) and not isinstance(names, (str, bytes)):
+        value = names[class_id] if 0 <= class_id < len(names) else None
+    else:
+        value = None
+    return str(value).lower() if value is not None else None
+
+
+def _detect_faces_yolo(image_bgr: np.ndarray, model: Any) -> list[FaceDetection]:
+    height, width = image_bgr.shape[:2]
+    try:
+        raw_results = model.predict(image_bgr, verbose=False, conf=_yolo_confidence_threshold())
+    except Exception:
+        return []
+
+    detections: list[FaceDetection] = []
+    allowed_class_names = _yolo_allowed_class_names()
+    for result in raw_results or []:
+        boxes = getattr(result, "boxes", None)
+        if boxes is None:
+            continue
+        for box in boxes:
+            xyxy = getattr(box, "xyxy", None)
+            if xyxy is None:
+                continue
+            values = np.asarray(xyxy).reshape(-1)[:4]
+            face_box = _box_from_xyxy(values, width, height)
+            if face_box is None:
+                continue
+
+            class_id = None
+            cls = getattr(box, "cls", None)
+            if cls is not None:
+                class_values = np.asarray(cls).reshape(-1)
+                if class_values.size:
+                    class_id = int(class_values[0])
+            class_name = _yolo_class_name(model, class_id)
+            if allowed_class_names and class_name is not None and class_name not in allowed_class_names:
+                continue
+
+            confidence = 1.0
+            conf = getattr(box, "conf", None)
+            if conf is not None:
+                conf_values = np.asarray(conf).reshape(-1)
+                if conf_values.size:
+                    confidence = float(conf_values[0])
+
+            detections.append(FaceDetection(box=face_box, confidence=confidence, detector=_YOLO_DETECTOR))
+
+    detections.sort(key=lambda detection: detection.box.area, reverse=True)
+    return detections
 
 
 def _insightface_root() -> Path:
@@ -201,6 +305,12 @@ def _box_from_xyxy(values: Sequence[float], width: int, height: int) -> FaceBox 
 
 
 def detect_face_details(image_bgr: np.ndarray) -> list[FaceDetection]:
+    yolo_model = _get_yolo_model()
+    if yolo_model is not None:
+        detections = _detect_faces_yolo(image_bgr, yolo_model)
+        if detections:
+            return detections
+
     app = _get_insightface_app()
     if app is not None:
         height, width = image_bgr.shape[:2]

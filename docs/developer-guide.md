@@ -4,7 +4,7 @@
 
 ## 기술 스택
 
-- 백엔드: FastAPI, OpenCV, ONNX Runtime, 선택적 InsightFace/ArcFace.
+- 백엔드: FastAPI, OpenCV, ONNX Runtime, 선택적 YOLO/InsightFace/ArcFace.
 - 캐릭터 변환: 선택적 Diffusers img2img 파이프라인, OpenCV fallback.
 - 프론트엔드: Next.js App Router, React, TypeScript.
 - 계약 문서: `contracts/openapi.yaml`, `contracts/video.schema.json`.
@@ -25,7 +25,7 @@ flowchart LR
   VideoRoutes --> JobService["영상 작업 서비스"]
   PresetRoutes --> Presets["캐릭터 스타일 프리셋"]
 
-  CandidateService --> Detector["얼굴 감지/임베딩\nInsightFace 우선\nOpenCV 대체"]
+  CandidateService --> Detector["얼굴 감지/임베딩\nYOLO 옵션\nInsightFace 우선\nOpenCV 대체"]
   CandidateService --> Candidates[("data/candidates\n후보 crop/분석 메타")]
 
   JobService --> Stylizer["캐릭터 스타일 생성\nDiffusers img2img\nOpenCV fallback"]
@@ -115,6 +115,19 @@ PERSONAMASK_INSIGHTFACE_CTX_ID=-1
 ```
 
 `CUDAExecutionProvider`는 호스트 GPU 드라이버와 ONNX Runtime CUDA 경로를 먼저 검증한 뒤 사용해야 합니다. GPU 경로가 준비되지 않았거나 InsightFace 초기화가 실패하면 OpenCV 대체 경로로 실행됩니다.
+
+YOLO 얼굴 검출 경로도 선택적으로 사용할 수 있습니다. 이 경로는 기본 설치에 포함하지 않으며, 얼굴 검출용 YOLO 모델 파일을 별도로 준비한 경우에만 활성화합니다.
+
+```bash
+pip install -r requirements-yolo.txt
+
+PERSONAMASK_FACE_DETECTOR=yolo
+PERSONAMASK_YOLO_FACE_MODEL=/path/to/yolo-face.pt
+PERSONAMASK_YOLO_FACE_CONF=0.35
+PERSONAMASK_YOLO_FACE_CLASSES=face
+```
+
+`PERSONAMASK_FACE_DETECTOR=yolo`인데 모델 경로가 비어 있거나 `ultralytics`가 설치되지 않은 경우에는 기존 InsightFace/OpenCV 경로로 돌아갑니다. COCO 기반 일반 YOLO 모델은 얼굴이 아니라 사람 전체를 잡을 수 있으므로, 발표나 데모에서는 얼굴 검출용 YOLO 모델을 쓰는 것이 안전합니다.
 
 ## 주요 API
 
